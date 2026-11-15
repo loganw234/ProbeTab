@@ -17,6 +17,10 @@ see. There is no cache, so every run does everything.
 Before a commit, run it with `--require-all`. Its `staged` check fails if a
 staged copy differs from the working copy the other checks read.
 
+Its `bench` check needs pyusb, which lives in `.venv/`;
+[tools/bench/README.md](tools/bench/README.md) says how to make it. Without it,
+the check is skipped, so `--require-all` fails.
+
 ## The authority
 
 The LabPro on the bench, through recorded traces. Vernier's manual is a source,

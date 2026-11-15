@@ -1,8 +1,10 @@
 # protocol/fixtures/
 
 Hand-written traces: the lead's model of what passes between a host and a
-LabPro, written from the manual before any LabPro was connected. Tests will use
-them in place of a device; none does yet.
+LabPro, written from the manual before any LabPro was connected. The bench
+script's tests use them in place of a device:
+[tools/bench/](../../tools/bench/README.md) replays `status-request.trace`
+through a fake pyusb backend.
 
 They are not evidence:
 

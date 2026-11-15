@@ -291,6 +291,37 @@ evidence = "a carriage return character follows each command"
 status = "manual"
 note = "Said of the serial port. Whether USB needs the carriage return is for the bench to show."
 
+[command.open]
+value = "{"
+source = "trm"
+page = 29
+evidence = "Every command must be enclosed in curly brackets, “{“ and “}”."
+status = "manual"
+note = "The evidence keeps the page's quotation marks as printed, with an opening mark on both sides of the {."
+
+[command.close]
+value = "}"
+source = "trm"
+page = 29
+evidence = "Every command must be enclosed in curly brackets, “{“ and “}”."
+status = "manual"
+
+[command.separator]
+value = ","
+source = "trm"
+page = 29
+evidence = "The command # and the option parameters are comma delimited."
+status = "manual"
+note = "Said of commands. Page 46's example shows a reply in the same braces and commas; that replies always take this form is the lead's reading, for the bench to show."
+
+[reply.terminator]
+value = "\r"
+source = "trm"
+page = 23
+evidence = "In ASCII mode, looking for a carriage return character can do this."
+status = "manual"
+note = "Said of USB: a reader knows an ASCII reply has ended at its carriage return. Whether a line feed follows it is for the bench to show."
+
 # Data
 
 [data.get_request]
@@ -368,6 +399,24 @@ source = "trm"
 page = 45
 evidence = "8888 Constant value."
 status = "manual"
+
+[status.software_id_position]
+value = 1
+unit = "place in the reply, counting from 1"
+source = "trm"
+page = 45
+evidence = "softwareID Current software ID in format: X.MMmms"
+status = "manual"
+note = "Page 45's table does not number its rows. The place is the row's, counted by the lead, and page 46's example reply begins with a value of that form."
+
+[status.check_value_position]
+value = 4
+unit = "place in the reply, counting from 1"
+source = "trm"
+page = 45
+evidence = "8888 Constant value."
+status = "manual"
+note = "Page 45's table does not number its rows. The place is the row's, counted by the lead, and page 46's example reply has 8888 fourth."
 
 [status.unretrieved_data_flag]
 value = 32

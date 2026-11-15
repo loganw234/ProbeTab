@@ -1,4 +1,9 @@
 # probetab-fixture 1
-# date: 2026-11-15T14:15:36-07:00
-# model: Command 7, the status request, as page 22 writes it for the serial port: s{7} then a carriage return. Whether USB takes the same bytes is for the bench to show. No reply is modelled.
+# date: 2026-11-15T15:58:46-07:00
+# model: Command 7 and its reply, as page 46 shows them after a reset. The command is s{7} and the carriage return page 22 puts after a serial command. The reply is its 17 values in braces, then a carriage return, which page 23 says is where a reader of an ASCII reply stops. It is read 64 bytes at a time, because transfers to the host come in multiples of 64 (page 22). The zeros after the carriage return are the lead's guess, and so is everything here about USB.
+# note: The times are placeholders, not measurements.
 OUT 0 73 7b 37 7d 0d
+IN 1200 7b 20 2b 36 2e 30 31 31 32 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 38 2e 38 38 38 30 30 45 2b 30 33 2c 20 2b 30 2e 30 30 30
+IN 1250 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20
+IN 1300 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 31 2e 30 30 30 30 30
+IN 1350 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 7d 0d 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00

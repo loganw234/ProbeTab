@@ -257,14 +257,18 @@ Each is a question for the bench, not something to code around.
     recording 2, which fits the shorter command. Its prose says the filter was
     applied.
 - **Channel and operation swapped.**
-  - Pages 40 and 47 set up channel 1 at 0 to 5 V as `s{1,14,1}`, with the
-    operation first.
+  - Page 40 labels `s{1,14,1}` as setting channel 1 to 0 to 5 V, with the
+    operation first. Page 47 shows the same command without a label.
   - Command 1's syntax (page 31) and the examples on pages 22, 43, 50 and 52
     to 55 put the channel first, as `s{1,1,14}`; pages 43, 50 and 52 add
     trailing zeros.
   - Which order a unit takes is for the bench.
 - **A copied column.** In Example 2 on page 40, the calculator column repeats
   Example 1's commands beside a different sequence.
+- **Sixteen bits or sixteen bytes.** Page 23 says a real-time sample comes back
+  as 16 bits, then that it is padded with zeros to 16 bytes, and page 24 says
+  16 bytes. This page reads the bits as one channel's reading and the bytes as
+  the padded record; the bench decides.
 
 ## What Phase 0 has to settle
 
@@ -277,6 +281,7 @@ Each is a question for the bench, not something to code around.
    value.
 5. Which order of channel and operation Command 1 takes.
 6. How fast real-time samples arrive over USB on the hosts that matter.
+7. How a reply ends: whether a line feed follows its carriage return.
 
 Licence: the folder table in [the README](../README.md) gives this file's
 licence.

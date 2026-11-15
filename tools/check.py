@@ -16,7 +16,8 @@ Before a commit, run with --require-all.
 The files checked are the working-tree copies of the files git would commit:
 the tracked files, plus the untracked files .gitignore does not exclude. The
 staged check says when a staged copy differs from the copy that was read.
-Programs are started by the full path shutil.which finds, never by a bare name.
+Programs are started by the full path shutil.which finds, never by a bare name;
+the bench check's Python is found by its path, as that check says.
 
 The checks, by name, each with what it cannot see:
 
@@ -49,18 +50,27 @@ The checks, by name, each with what it cannot see:
              is found, no file shares a run of 8 or more words in a row with the
              manual's text. Without the manual, that part is skipped by name.
              How words are compared:
-               - both texts are Unicode-normalised (NFKC);
-               - invisible format characters are removed;
+               - both texts are decomposed (NFKD), so a ligature or a
+                 full-width letter counts as its plain letters, and an accented
+                 letter as its letter;
+               - marks (Unicode categories Mn and Me) and invisible format
+                 characters (Cf) are removed;
                - case and punctuation are ignored;
-               - a file with a UTF-16 byte-order mark is read as UTF-16.
-             In the facts file, a line that gives a fact its own evidence is
-             excepted. A line shaped like one inside a note is not.
+               - a file with a UTF-32 or UTF-16 byte-order mark is read as
+                 such.
+             In the facts file, a line is excepted when its value is one of the
+             facts' evidence phrases. A line shaped like one inside a note is
+             checked, unless it repeats a fact's evidence.
              Limits: these are not caught:
                - a PDF inside another format, such as a zip;
-               - an extract re-encoded (base64, say), or in UTF-16 with no
-                 byte-order mark;
-               - letters swapped for look-alikes from other scripts;
-               - words or markup inserted every few words;
+               - an extract re-encoded (base64, say), or in UTF-16 or UTF-32
+                 with no byte-order mark;
+               - letters swapped for look-alikes from other scripts, or for
+                 Latin letters that do not decompose into a plain letter and
+                 a mark, such as ø, ł, đ, ħ and ı;
+               - words or markup inserted every few words, or words broken by
+                 a space or by an invisible character that is a letter or a
+                 symbol, such as U+3164 or U+2800;
                - a passage in pieces of 7 words or fewer, or split across
                  files;
                - a close paraphrase, which a verifier judges;
@@ -151,6 +161,26 @@ The checks, by name, each with what it cannot see:
                  to this check;
                - TypeScript's types are not checked, as Node strips them;
                - what the app does with the values is not checked.
+  bench      The bench script's tests pass. Each tools/bench/test_*.py is run,
+             and its tests replay fixtures through a fake pyusb backend in
+             place of a LabPro. A file passes only when it ran at least one
+             test and unittest's summary is plain OK: a skipped test, an
+             expected failure or an unexpected success fails it. The tests run
+             under a Python that has pyusb: the one running this script if it
+             has it, otherwise the repository's .venv, found by its path. With
+             neither, the check is skipped by name. In what it reports, the
+             paths of the repository and the temp folder are shown as <repo>
+             and <temp>, where written plainly or with the doubled backslashes
+             of a Python repr; other forms, and other paths, are not
+             rewritten.
+             Limits:
+               - the fake is the lead's model of a LabPro, built from the facts
+                 and a fixture, so passing tests say the script agrees with
+                 that model, not with a LabPro;
+               - the script's paths through a real backend, such as libusb,
+                 are not run;
+               - what the tests assert is not read here, only whether they
+                 pass; --control plants faults they must catch.
 
 --history scans each commit in RANGE: its author and committer names and
 addresses, its message, and the lines it adds (a merge's, against its first
@@ -196,6 +226,8 @@ MANIFEST_LINE = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9._-]+\.trace)")
 EXAMPLE = re.compile(r"^```trace\n(.*?)^```", re.S | re.M)
 RUN = 8  # a run of this many words in a row shared with the manual counts as copied
 WORD = re.compile(r"[a-z0-9]+")
+DROPPED = {"Mn", "Me", "Cf"}  # marks and invisible format characters, removed before words are compared
+BENCH = "tools/bench/"
 EVIDENCE_LINE = re.compile(r"""^evidence = (?:"[^"\n]*"|'[^'\n]*')[ \t]*$""", re.M)
 LICENCE_FILES = {
     "MIT": "LICENSE",
@@ -264,6 +296,7 @@ class Context:
         self.runs = {}
         self.render = generate.render  # a control may put a mutant here
         self.files = []                # the real file set, for controls that build copies
+        self.pythons = None            # where the bench check looks for pyusb; a control may narrow it
 
 
 def tool(name):
@@ -378,16 +411,23 @@ def manual_source(root):
 def words_of(text):
     """Words as the word-run check compares them.
 
-    The text is Unicode-normalised (NFKC), its invisible format characters
-    (category Cf, such as zero-width spaces and soft hyphens) are removed, and it
-    is lower-cased. Only letters and digits count.
+    The text is decomposed (NFKD), so a ligature or a full-width letter becomes
+    its plain letters, and an accented letter its letter and its accent. Marks
+    (categories Mn and Me, such as accents and the combining grapheme joiner)
+    and invisible format characters (Cf, such as zero-width spaces and soft
+    hyphens) are removed, and it is lower-cased; that is done twice, as
+    lower-casing can itself add a mark. Only letters a to z and digits count.
     """
-    text = "".join(ch for ch in unicodedata.normalize("NFKC", text) if unicodedata.category(ch) != "Cf")
-    return WORD.findall(text.lower())
+    def plain(part):
+        return "".join(ch for ch in unicodedata.normalize("NFKD", part) if unicodedata.category(ch) not in DROPPED)
+
+    return WORD.findall(plain(plain(text).lower()))
 
 
 def file_text(data):
-    """A file's text for the word-run check: UTF-16 by its byte-order mark, otherwise UTF-8."""
+    """A file's text for the word-run check: UTF-32 or UTF-16 by its byte-order mark, otherwise UTF-8."""
+    if data[:4] in (b"\xff\xfe\x00\x00", b"\x00\x00\xfe\xff"):
+        return data.decode("utf-32", errors="replace")
     if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
         return data.decode("utf-16", errors="replace")
     return data.decode("utf-8", errors="replace")
@@ -860,6 +900,97 @@ def check_history(revisions, ctx, repo=ROOT):
     return report
 
 
+def bench_pythons(ctx):
+    """Where the bench check looks for a Python with pyusb, in order, each with how it is named."""
+    if ctx.pythons is not None:
+        return ctx.pythons
+    venv = ctx.reference_root / ".venv"
+    return [("the Python running this script", Path(sys.executable)),
+            (".venv/Scripts/python.exe", venv / "Scripts" / "python.exe"),
+            (".venv/bin/python", venv / "bin" / "python")]
+
+
+def bench_python(ctx):
+    """(a Python that has pyusb, how to say which), or (None, why there is none)."""
+    probe = "import platform, usb; print(platform.python_version(), usb.__version__)"
+    for label, python in bench_pythons(ctx):
+        if not python.is_file():
+            continue
+        found = subprocess.run([str(python), "-I", "-B", "-c", probe], capture_output=True)
+        if found.returncode == 0:
+            version, pyusb = found.stdout.decode("ascii", errors="replace").split()[:2]
+            return python, f"python {version} with pyusb {pyusb} ({label})"
+    return None, ("pyusb is in neither the Python running this script nor .venv; "
+                  "tools/bench/README.md says how to install it")
+
+
+def test_problems(output):
+    """One line for each failing test in unittest's report: its name, then what it raised."""
+    problems = []
+    for block in re.split(r"^={40,}$", output, flags=re.M)[1:]:
+        lines = block.strip("\n").split("\n")
+        message, started = [], False
+        for line in lines[1:]:
+            if re.fullmatch(r"-{40,}", line):
+                if started:
+                    break
+                continue
+            if not started and (line.startswith("Traceback") or line.startswith(" ") or not line.strip()):
+                continue
+            started = True
+            message.append(line)
+        problems.append(f"{lines[0].strip()}: {collapse(' '.join(message))[:1200]}")
+    return problems
+
+
+def masked(text, paths):
+    """text with each (path, name) in paths shown as name, where the path is written plainly or with
+    the doubled backslashes a Python repr gives it on Windows."""
+    for path, name in paths:
+        text = text.replace(path, name)
+        if "\\" in path:
+            text = text.replace(path.replace("\\", "\\\\"), name)
+    return text
+
+
+def check_bench(root, files, ctx):
+    report = Report("bench")
+    tests = [name for name in files
+             if name.startswith(BENCH) and posixpath.basename(name).startswith("test_") and name.endswith(".py")]
+    if not tests:
+        report.fail(f"{BENCH} holds no test_*.py, so nothing tests the bench script")
+        return report
+    python, which = bench_python(ctx)
+    if python is None:
+        report.skip(f"the bench script's tests are not run: {which}")
+        return report
+    passed = 0
+    temp = tempfile.gettempdir()
+    for name in tests:
+        run = subprocess.run([str(python), "-I", "-B", str(root / name)], cwd=root, capture_output=True, timeout=300)
+        # On Windows, Python writes CRLF to a piped stderr; the report is read line by line. Paths under
+        # the repository and the temp folder can name the user, so they are shown as <repo> and <temp>.
+        output = run.stderr.decode("utf-8", errors="replace").replace("\r\n", "\n")
+        output = masked(output, ((str(root), "<repo>"), (temp, "<temp>")))
+        ran = re.search(r"^Ran (\d+) tests? in ", output, re.M)
+        summary = output.strip().split("\n")[-1].strip()
+        if run.returncode == 0 and ran and int(ran.group(1)) > 0 and summary == "OK":
+            passed += int(ran.group(1))
+            continue
+        if run.returncode == 0 and ran and summary.startswith("OK ("):
+            report.fail(f"{name}: unittest reports {summary}; a skipped test, an expected failure or an "
+                        f"unexpected success is not a pass")
+            continue
+        problems = test_problems(output) or [collapse(output)[-300:] or f"it exited with status {run.returncode}"]
+        for problem in problems:
+            report.fail(f"{name}: {problem}")
+    if report.fails:
+        report.note(f"run by {which}")
+    else:
+        report.note(f"{passed} tests passed against the fake backend, run by {which}")
+    return report
+
+
 CHECKS = {
     "layout": check_layout,
     "licences": check_licences,
@@ -871,6 +1002,7 @@ CHECKS = {
     "facts": check_facts,
     "traces": check_traces,
     "generated": check_generated,
+    "bench": check_bench,
 }
 
 
@@ -1265,6 +1397,71 @@ def plant_evidence_in_a_comment(root, files, ctx):
     return files
 
 
+def manual_run(root, ctx, length, keep):
+    """length words in a row from page 22, from its 41st word on, each one that keep accepts."""
+    words = words_of(manual_page(root, ctx, 22))
+    for start in range(40, len(words) - length):
+        run = words[start:start + length]
+        if all(keep(word) for word in run):
+            return run
+    raise RuntimeError(f"control cannot be planted: page 22 has no run of {length} such words")
+
+
+ACCENTED = {"a": "á", "e": "é", "i": "í", "o": "ó", "u": "ú", "y": "ý"}
+
+
+def plant_accented_run(root, files, ctx):
+    words = manual_run(root, ctx, 12, keep=lambda word: any(ch in ACCENTED for ch in word))
+    accented = []
+    for word in words:
+        index = next(i for i, ch in enumerate(word) if ch in ACCENTED)
+        accented.append(word[:index] + ACCENTED[word[index]] + word[index + 1:])
+    append(root, "docs/README.md", "\n" + " ".join(accented) + "\n")
+    return files
+
+
+def plant_joiner_run(root, files, ctx):
+    words = manual_run(root, ctx, 12, keep=lambda word: len(word) > 1)
+    append(root, "docs/README.md", "\n" + " ".join(word[0] + chr(0x034F) + word[1:] for word in words) + "\n")
+    return files
+
+
+def plant_utf32_run(root, files, ctx):
+    words = words_of(manual_page(root, ctx, 22))[40:56]
+    append(root, "docs/notes32.txt", (chr(0xFEFF) + " ".join(words) + "\n").encode("utf-32-le"))
+    return walked_files(root)
+
+
+def plant_bench_sends_a_reset(root, files, ctx):
+    edit(root, BENCH + "labpro_bench.py", r'facts\["command\.request_system_status"\]', 'facts["command.reset"]',
+         within="def first_contact")
+    return files
+
+
+def plant_fixture_reply_changed(root, files, ctx):
+    """8888, fourth in the fixture's reply, becomes 8887."""
+    edit(root, FIXTURES + "status-request.trace", r"2b 38 2e 38 38 38 30 30", "2b 38 2e 38 38 37 30 30",
+         within="# probetab-fixture 1")
+    return files
+
+
+def plant_bench_tests_skipped(root, files, ctx):
+    edit(root, BENCH + "test_bench.py", r"class FirstContact\(unittest\.TestCase\):",
+         '@unittest.skip("planted")\nclass FirstContact(unittest.TestCase):', within="class FirstContact")
+    return files
+
+
+def plant_bench_failure_showing_a_path(root, files, ctx):
+    """A failing assertion whose message holds the script's output, and in it a scratch path, in a repr."""
+    edit(root, BENCH + "test_bench.py", r'self\.assertIn\("never writes over a file", printed\)',
+         'self.assertIn("zzplanted", printed)', within="def test_never_writes_over_a_file")
+    return files
+
+
+def plant_bench_tests_left_out(root, files, ctx):
+    return [name for name in files if not (name.startswith(BENCH) and posixpath.basename(name).startswith("test_"))]
+
+
 def plant_unsafe_integer(root, files, ctx):
     edit(root, FACTS, r"value = 0x08F7", "value = 9007199254740993", within=FACT)
     return files
@@ -1347,6 +1544,15 @@ CONTROLS = [
     ("reference", "a passage in a UTF-16 file", plant_utf16_run, "docs/notes.txt:1: shares a run of"),
     ("reference", "an evidence-shaped line inside a note", plant_evidence_line_in_a_note,
      "protocol/labpro-facts.toml:"),
+    ("reference", "an accented letter in every word", plant_accented_run, "docs/README.md:8: shares a run of"),
+    ("reference", "a combining grapheme joiner in every word", plant_joiner_run, "docs/README.md:8: shares a run of"),
+    ("reference", "a passage in a UTF-32 file", plant_utf32_run, "docs/notes32.txt:1: shares a run of"),
+    ("bench", "the bench script sending a reset", plant_bench_sends_a_reset, "the script sent"),
+    ("bench", "the fixture's reply changed", plant_fixture_reply_changed, "status.check_value"),
+    ("bench", "the bench tests left out", plant_bench_tests_left_out, "holds no test_*.py"),
+    ("bench", "the bench tests skipped", plant_bench_tests_skipped, "unittest reports OK (skipped="),
+    ("bench", "a failure that shows a scratch path", plant_bench_failure_showing_a_path,
+     "'zzplanted' not found in 'refused: <temp>"),
 ]
 
 
@@ -1459,6 +1665,14 @@ def build_run_of_seven(base, ctx):
     return check_reference(root, walked_files(root), ctx)
 
 
+def build_bench_without_pyusb(base, ctx):
+    """No Python with pyusb to be found: the bench check must be skipped by name, not passed."""
+    root = copy_files(ctx.files, base / "bench-without-pyusb")
+    bare = Context(ctx.reference_root, ctx.git_root)
+    bare.pythons = []
+    return check_bench(root, walked_files(root), bare)
+
+
 def build_bench_fact_on_recording(base, ctx):
     """A bench fact naming a sound, listed recording: the bench rule must let it pass."""
     root = copy_files(ctx.files, base / "bench-recording")
@@ -1491,6 +1705,8 @@ BUILT_CONTROLS = [
      "added lines: a Unix home path"),
     ("history", "a range with no commits", build_empty_range, "skip",
      "no commits in HEAD..HEAD"),
+    ("bench", "no Python with pyusb", build_bench_without_pyusb, "skip",
+     "the bench script's tests are not run"),
 ]
 
 
