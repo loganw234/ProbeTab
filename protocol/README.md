@@ -5,8 +5,12 @@ What this project knows about the LabPro, and how it knows it.
 ## labpro-facts.toml
 
 [labpro-facts.toml](labpro-facts.toml) is the single source for facts about
-the LabPro. Code and documents take their values from it, or from files
-generated from it; they do not restate them.
+the LabPro.
+
+- Code takes its values from it, or from files generated from it, and never
+  retypes them.
+- A document may restate a value for its reader, beside the page it comes from.
+  The facts file wins any disagreement, and no gate compares the two.
 
 Each fact names its source, the source's page, the words on that page that
 state it, and a status:
@@ -41,10 +45,17 @@ Vernier's LabPro Technical Reference Manual, revision dated 08/02/02.
 - [traces/FORMAT.md](traces/FORMAT.md) describes the format.
   `tools/traces.py` defines it.
 
+## REFERENCE.md
+
+[REFERENCE.md](REFERENCE.md) describes the commands Phase 0 sends first, in
+this project's own words. It also lists:
+
+- where the manual disagrees with itself;
+- what only the bench can settle.
+
 ## Still to come
 
-The protocol reference, written in this project's own words from the manual and
-the bench.
+The bench's answers: recorded traces, and the facts they move to `bench`.
 
 ## Licence
 

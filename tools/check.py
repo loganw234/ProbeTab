@@ -45,8 +45,27 @@ The checks, by name, each with what it cannot see:
   reference  No file is a PDF, judged by its name or by a PDF header in its
              first 1024 bytes, and no file has the bytes of the manual pinned in
              protocol/labpro-facts.toml.
-             Limit: a PDF inside another format, such as a zip, and a pasted,
-             re-encoded or edited extract of the manual are not caught.
+             Where the manual is present with its pinned SHA-256 and pdftotext
+             is found, no file shares a run of 8 or more words in a row with the
+             manual's text. Without the manual, that part is skipped by name.
+             How words are compared:
+               - both texts are Unicode-normalised (NFKC);
+               - invisible format characters are removed;
+               - case and punctuation are ignored;
+               - a file with a UTF-16 byte-order mark is read as UTF-16.
+             In the facts file, a line that gives a fact its own evidence is
+             excepted. A line shaped like one inside a note is not.
+             Limits: these are not caught:
+               - a PDF inside another format, such as a zip;
+               - an extract re-encoded (base64, say), or in UTF-16 with no
+                 byte-order mark;
+               - letters swapped for look-alikes from other scripts;
+               - words or markup inserted every few words;
+               - a passage in pieces of 7 words or fewer, or split across
+                 files;
+               - a close paraphrase, which a verifier judges;
+               - many short evidence phrases that together carry a page.
+             Matching depends on the pdftotext build, as for facts.
   privacy    No file holds:
                - a home-directory path, in any of these forms:
                  - Windows: a drive letter or a leading backslash, then Users;
@@ -159,6 +178,7 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -174,6 +194,9 @@ MANIFEST = TRACES + "SHA256SUMS"
 FORMAT_DOC = TRACES + "FORMAT.md"
 MANIFEST_LINE = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9._-]+\.trace)")
 EXAMPLE = re.compile(r"^```trace\n(.*?)^```", re.S | re.M)
+RUN = 8  # a run of this many words in a row shared with the manual counts as copied
+WORD = re.compile(r"[a-z0-9]+")
+EVIDENCE_LINE = re.compile(r"""^evidence = (?:"[^"\n]*"|'[^'\n]*')[ \t]*$""", re.M)
 LICENCE_FILES = {
     "MIT": "LICENSE",
     "CC-BY-4.0": "LICENSE-DOCS-DATA",
@@ -238,6 +261,7 @@ class Context:
         self.reference_root = reference_root
         self.git_root = git_root
         self.pages = {}
+        self.runs = {}
         self.render = generate.render  # a control may put a mutant here
         self.files = []                # the real file set, for controls that build copies
 
@@ -351,9 +375,77 @@ def manual_source(root):
         return {}
 
 
+def words_of(text):
+    """Words as the word-run check compares them.
+
+    The text is Unicode-normalised (NFKC), its invisible format characters
+    (category Cf, such as zero-width spaces and soft hyphens) are removed, and it
+    is lower-cased. Only letters and digits count.
+    """
+    text = "".join(ch for ch in unicodedata.normalize("NFKC", text) if unicodedata.category(ch) != "Cf")
+    return WORD.findall(text.lower())
+
+
+def file_text(data):
+    """A file's text for the word-run check: UTF-16 by its byte-order mark, otherwise UTF-8."""
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return data.decode("utf-16", errors="replace")
+    return data.decode("utf-8", errors="replace")
+
+
+def drop_evidence_lines(text, root):
+    """The facts file's text with each line that gives a fact its own evidence blanked.
+
+    That is the one place the manual's own words belong. A line shaped like
+    one whose value is no fact's evidence, such as one inside a note, is kept
+    and checked.
+    """
+    try:
+        evidence = {str(fact.get("evidence")) for _, fact in labpro_facts.facts(labpro_facts.load(root))}
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+        return text
+    kept = []
+    for line in text.split("\n"):
+        if EVIDENCE_LINE.fullmatch(line):
+            try:
+                value = tomllib.loads(line).get("evidence")
+            except tomllib.TOMLDecodeError:
+                value = None
+            if value in evidence:
+                kept.append("")
+                continue
+        kept.append(line)
+    return "\n".join(kept)
+
+
+def word_runs(pages):
+    words = words_of(" ".join(pages))
+    return {tuple(words[i:i + RUN]) for i in range(len(words) - RUN + 1)}
+
+
+def shared_runs(text, runs):
+    """(line, length) for each run of RUN or more words in a row that text shares with the manual."""
+    tokens = []
+    for number, line in enumerate(text.split("\n"), start=1):
+        tokens.extend((word, number) for word in words_of(line))
+    words = [word for word, _ in tokens]
+    found, index = [], 0
+    while index + RUN <= len(words):
+        if tuple(words[index:index + RUN]) in runs:
+            end = index + 1
+            while end + RUN <= len(words) and tuple(words[end:end + RUN]) in runs:
+                end += 1
+            found.append((tokens[index][1], end - index + RUN - 1))
+            index = end + RUN - 1
+        else:
+            index += 1
+    return found
+
+
 def check_reference(root, files, ctx):
     report = Report("reference")
-    pin = manual_source(root).get("sha256")
+    source = manual_source(root)
+    pin = source.get("sha256")
     if not pin:
         report.fail(f"{FACTS} pins no sha256 for the manual, so its bytes cannot be refused")
     for name in files:
@@ -363,6 +455,21 @@ def check_reference(root, files, ctx):
         if pin and hashlib.sha256(data).hexdigest() == pin:
             report.fail(f"{name}: has the bytes of Vernier's manual")
     report.note(f"{len(files)} files read")
+    pages = manual_pages("trm", source, ctx, report, "copied runs") if pin else None
+    if pages is None:
+        return report
+    if pin not in ctx.runs:
+        ctx.runs[pin] = word_runs(pages)
+    copied = 0
+    for name in files:
+        text = file_text((root / name).read_bytes())
+        if name == FACTS:
+            text = drop_evidence_lines(text, root)
+        for line, length in shared_runs(text, ctx.runs[pin]):
+            copied += 1
+            report.fail(f"{name}:{line}: shares a run of {length} words with the manual")
+    if not copied:
+        report.note(f"no file shares {RUN} words in a row with the manual, outside evidence lines")
     return report
 
 
@@ -518,15 +625,15 @@ def bench_problem(trace, census):
     return None
 
 
-def manual_pages(key, source, ctx, report):
+def manual_pages(key, source, ctx, report, purpose="evidence"):
     """The source's pages as collapsed text, or None with the reason reported."""
     local = source.get("local")
     if not local:
-        report.skip(f"evidence for source {key!r} not checked: it names no local copy")
+        report.skip(f"{purpose} for source {key!r} not checked: it names no local copy")
         return None
     path = ctx.reference_root / local
     if not path.is_file():
-        report.skip(f"evidence not checked: {local} is not in the repository folder")
+        report.skip(f"{purpose} not checked: {local} is not in the repository folder")
         return None
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     if digest != source.get("sha256"):
@@ -534,7 +641,7 @@ def manual_pages(key, source, ctx, report):
         return None
     pdftotext = tool("pdftotext")
     if not pdftotext:
-        report.skip("evidence not checked: pdftotext is not on PATH")
+        report.skip(f"{purpose} not checked: pdftotext is not on PATH")
         return None
     if digest not in ctx.pages:
         version = subprocess.run([pdftotext, "-v"], capture_output=True)
@@ -1109,6 +1216,55 @@ def plant_unprintable_header(root, files, ctx):
     return walked_files(root)
 
 
+def manual_page(root, ctx, number):
+    source = manual_source(root)
+    pages = manual_pages("trm", source, ctx, Report("unused"), "copied runs") if source.get("sha256") else None
+    if not pages:
+        raise Unplantable("the manual's text is not available")
+    return pages[number - 1]
+
+
+def plant_pasted_manual_sentence(root, files, ctx):
+    append(root, "docs/README.md", "\n" + " ".join(manual_page(root, ctx, 22).split()[40:52]) + "\n")
+    return files
+
+
+def plant_run_of_eight(root, files, ctx):
+    words = words_of(manual_page(root, ctx, 22))[40:48]
+    append(root, "docs/README.md", "\nzzplanted " + " ".join(words) + " zzplanted\n")
+    return files
+
+
+def plant_zero_width_run(root, files, ctx):
+    words = words_of(manual_page(root, ctx, 22))[40:56]
+    split = [word[0] + chr(0x200B) + word[1:] if index % 5 == 4 and len(word) > 1 else word
+             for index, word in enumerate(words)]
+    append(root, "docs/README.md", "\n" + " ".join(split) + "\n")
+    return files
+
+
+def plant_utf16_run(root, files, ctx):
+    words = words_of(manual_page(root, ctx, 22))[40:56]
+    append(root, "docs/notes.txt", (chr(0xFEFF) + " ".join(words) + "\n").encode("utf-16-le"))
+    return walked_files(root)
+
+
+def plant_evidence_line_in_a_note(root, files, ctx):
+    words = words_of(manual_page(root, ctx, 22))[40:63]
+    edit(root, FACTS, r'status = "manual"',
+         'status = "manual"\nnote = """\nevidence = \'' + " ".join(words) + '\'\n"""', within=FACT)
+    return files
+
+
+def plant_evidence_in_a_comment(root, files, ctx):
+    phrases = [str(fact.get("evidence", "")) for _, fact in labpro_facts.facts(labpro_facts.load(root))]
+    long = [phrase for phrase in phrases if len(WORD.findall(phrase.lower())) >= RUN + 2]
+    if not long:
+        raise RuntimeError("control cannot be planted: no evidence phrase of ten words or more")
+    append(root, FACTS, "\n# " + long[0] + "\n")
+    return files
+
+
 def plant_unsafe_integer(root, files, ctx):
     edit(root, FACTS, r"value = 0x08F7", "value = 9007199254740993", within=FACT)
     return files
@@ -1182,6 +1338,15 @@ CONTROLS = [
     ("traces", "a header value that is not printable", plant_unprintable_header, "not printable text"),
     ("generated", "an integer beyond JavaScript's safe ones", plant_unsafe_integer,
      "beyond the integers JavaScript holds exactly"),
+    ("reference", "a sentence pasted from the manual", plant_pasted_manual_sentence,
+     "docs/README.md:8: shares a run of"),
+    ("reference", "an evidence phrase copied into a comment", plant_evidence_in_a_comment,
+     "shares a run of"),
+    ("reference", "a run of exactly eight words", plant_run_of_eight, "docs/README.md:8: shares a run of 8 words"),
+    ("reference", "zero-width spaces inside the words", plant_zero_width_run, "docs/README.md:8: shares a run of"),
+    ("reference", "a passage in a UTF-16 file", plant_utf16_run, "docs/notes.txt:1: shares a run of"),
+    ("reference", "an evidence-shaped line inside a note", plant_evidence_line_in_a_note,
+     "protocol/labpro-facts.toml:"),
 ]
 
 
@@ -1286,6 +1451,14 @@ def build_write_refusals(base, ctx):
     return report
 
 
+def build_run_of_seven(base, ctx):
+    """Seven words in a row from the manual are one short of a run, and must pass."""
+    root = copy_files(ctx.files, base / "run-of-seven")
+    words = words_of(manual_page(root, ctx, 22))[40:47]
+    append(root, "docs/README.md", "\nzzplanted " + " ".join(words) + " zzplanted\n")
+    return check_reference(root, walked_files(root), ctx)
+
+
 def build_bench_fact_on_recording(base, ctx):
     """A bench fact naming a sound, listed recording: the bench rule must let it pass."""
     root = copy_files(ctx.files, base / "bench-recording")
@@ -1305,6 +1478,7 @@ BUILT_CONTROLS = [
      "refused a value holding a line break"),
     ("traces", "traces.write given a value that is not text", build_write_refusals, "fail",
      "refused a value that is not text"),
+    ("reference", "a run of seven words from the manual", build_run_of_seven, "clean", "docs/README.md:"),
     ("staged", "a staged copy changed afterwards", build_staged, "fail",
      "notes.txt: its staged copy differs"),
     ("history", "a home path added by a commit", build_linear_history, "fail",
@@ -1366,8 +1540,15 @@ def run_controls(files, ctx, require_all):
         built = {}
         for name, title, build, outcome, expect in BUILT_CONTROLS:
             if build not in built:
-                built[build] = build(base, ctx)
+                try:
+                    built[build] = build(base, ctx)
+                except Unplantable as why:
+                    built[build] = why
             report = built[build]
+            if isinstance(report, Unplantable):
+                skipped += 1
+                print(f"  SKIP   {name:<9} {title}: not built, {report}")
+                continue
             if outcome == "clean":
                 wrong = [message for message in report.fails if expect in message]
                 if wrong:

@@ -25,7 +25,10 @@ not the authority.
 - A fact about the LabPro goes into `protocol/labpro-facts.toml` first, with
   its page and the words that state it, status `manual`.
 - It becomes `bench` only with a recorded trace.
-- Code and documents take values from that file and never retype them.
+- Code takes values from that file, or its generated copy, and never retypes
+  them.
+- A document may restate a value for its reader, beside the page it comes from.
+  The facts file wins any disagreement, and no gate compares the two.
 - After changing it, run `python tools/generate.py`. The app's copy is
   generated, and the gate fails until it matches.
 - Recordings of real sessions go in `protocol/traces/`, listed in its

@@ -1,7 +1,9 @@
 # protocol/labpro-facts.toml
 #
-# The single source for facts about the LabPro. Code and documents take values
-# from here, or from files generated from here; they do not restate them.
+# The single source for facts about the LabPro. Code takes values from here, or
+# from files generated from here, and never retypes them. A document may restate
+# a value for its reader, beside its page; this file wins any disagreement, and
+# no gate compares the two.
 #
 # Each fact is a table with:
 #   value     the fact
@@ -109,6 +111,7 @@ source = "trm"
 page = 24
 evidence = "the number of data points being collected is limited to 12k samples/# of channels."
 status = "manual"
+note = "The page says 12k, read here as 12,000, as pages 12, 27, 51, 59 and 81 write it. Command 3 allows up to 12,287 (page 35; see collection.max_points)."
 
 [realtime.usb_max_rate]
 value = 1000
@@ -225,4 +228,224 @@ unit = "milliamps"
 source = "trm"
 page = 74
 evidence = "5.3VDC (nominal). 180mA max."
+status = "manual"
+
+# Commands. A command is its number in curly braces, then its parameters,
+# comma separated (page 29). protocol/REFERENCE.md says how they fit together.
+
+[command.reset]
+value = 0
+source = "trm"
+page = 30
+evidence = "Command 0 Reset LabPro"
+status = "manual"
+
+[command.channel_setup]
+value = 1
+source = "trm"
+page = 31
+evidence = "Command 1 Channel Setup"
+status = "manual"
+
+[command.data_collection_setup]
+value = 3
+source = "trm"
+page = 35
+evidence = "Command 3 Data Collection Setup"
+status = "manual"
+
+[command.conversion_equation_setup]
+value = 4
+source = "trm"
+page = 39
+evidence = "Command 4 Conversion Equation Setup (Analog)"
+status = "manual"
+
+[command.request_system_status]
+value = 7
+source = "trm"
+page = 45
+evidence = "Command 7 Request System Status"
+status = "manual"
+
+[command.request_channel_data]
+value = 9
+source = "trm"
+page = 48
+evidence = "Command 9 Request Channel Data"
+status = "manual"
+
+[command.prefix]
+value = "s"
+source = "trm"
+page = 21
+evidence = "s{command number, parameter 1,"
+status = "manual"
+note = "The manual writes commands this way for a computer host. Whether USB wants the s is for the bench to show."
+
+[command.serial_terminator]
+value = "\r"
+source = "trm"
+page = 22
+evidence = "a carriage return character follows each command"
+status = "manual"
+note = "Said of the serial port. Whether USB needs the carriage return is for the bench to show."
+
+# Data
+
+[data.get_request]
+value = "g"
+source = "trm"
+page = 21
+evidence = 'requesting data by sending: the character "g".'
+status = "manual"
+
+[data.binary_mode_command]
+value = "{4,0,-1}"
+source = "trm"
+page = 21
+evidence = "Binary mode is requested by the command {4,0, -1}"
+status = "manual"
+note = "Command 4 with channel 0 and equation type -1 (page 39). Page 39 calls the same mode hexadecimal; whether its bytes arrive raw or as hex text is for the bench to show."
+
+[data.binary_packing_max]
+value = 4
+unit = "samples per USB packet"
+source = "trm"
+page = 23
+evidence = "X must be a value from 1 to 4"
+status = "manual"
+
+[data.ascii_number_format]
+value = "sm.dddddEsee"
+source = "trm"
+page = 21
+evidence = "in the format of sm.dddddEsee"
+status = "manual"
+
+[data.binary_sample_bits]
+value = 16
+unit = "bits"
+source = "trm"
+page = 21
+evidence = "The data format is 16 bits of ADC output that is zero filled, left justified"
+status = "manual"
+
+[data.byte_order]
+value = "most significant byte first"
+source = "trm"
+page = 21
+evidence = "The data is transferred most significant byte first."
+status = "manual"
+
+[data.realtime_time_counter_bits]
+value = 32
+unit = "bits"
+source = "trm"
+page = 21
+evidence = "all active channels plus the 32-bit time counter are returned"
+status = "manual"
+
+[data.checksum]
+value = "serial port only"
+source = "trm"
+page = 22
+evidence = "(serial port only, does not apply to USB communications)"
+status = "manual"
+
+# Command 7's reply
+
+[status.register_count]
+value = 17
+source = "trm"
+page = 45
+evidence = "17 status registers"
+status = "manual"
+
+[status.check_value]
+value = 8888
+source = "trm"
+page = 45
+evidence = "8888 Constant value."
+status = "manual"
+
+[status.unretrieved_data_flag]
+value = 32
+unit = "added to the system state"
+source = "trm"
+page = 45
+evidence = "Add 32 to the value if the last data collected has not yet been retrieved."
+status = "manual"
+
+# Command 3's parameters
+
+[collection.max_points]
+value = 12287
+source = "trm"
+page = 35
+evidence = "The possible values are 1 to 12,287"
+status = "manual"
+note = "Pages 12, 27, 51, 59 and 81 give 12,000, and pages 24, 74, 82 and 83 give 12k. The bench decides which a unit accepts."
+
+[collection.realtime_points]
+value = -1
+source = "trm"
+page = 35
+evidence = "Setting this value to –1 puts LabPro into real-time data collection mode."
+status = "manual"
+note = "The page writes the minus as an en dash (U+2013), and the evidence keeps it."
+
+[collection.sample_time_min]
+value = 0.00002
+unit = "seconds"
+source = "trm"
+page = 35
+evidence = "The possible values are 0.00002 to 16,000 seconds"
+status = "manual"
+note = "0.00002 seconds, 20 microseconds, is fast mode's fastest (page 36). Outside fast mode, page 35 tables a longer minimum for each kind of probe: analog 100 microseconds, sonic 8 milliseconds, digital 200 microseconds a channel. The pairing of rows was read with pdftotext -raw and -table; -layout misaligns them."
+
+[collection.sample_time_max]
+value = 16000
+unit = "seconds"
+source = "trm"
+page = 35
+evidence = "The possible values are 0.00002 to 16,000 seconds"
+status = "manual"
+
+[collection.sample_time_default]
+value = 0.5
+unit = "seconds"
+source = "trm"
+page = 35
+evidence = "The default sampling time is 0.5 second."
+status = "manual"
+
+# Command 1's operations for an analog channel, and Command 9's modes
+
+[channel.operation_auto_id]
+value = 1
+source = "trm"
+page = 31
+evidence = "1 Auto-ID the sensor"
+status = "manual"
+
+[channel.operation_voltage_0_5]
+value = 14
+source = "trm"
+page = 31
+evidence = "14 Voltage, 0-5V"
+status = "manual"
+
+[channel_data.mode_retest]
+value = 0
+source = "trm"
+page = 48
+evidence = "0 Re-tests the channel for AutoID value"
+status = "manual"
+
+[channel_data.mode_stored]
+value = 1
+source = "trm"
+page = 48
+evidence = "1 returns the stored AutoID value"
 status = "manual"

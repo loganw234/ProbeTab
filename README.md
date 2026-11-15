@@ -71,10 +71,10 @@ licence.
 ## Not affiliated with Vernier or Texas Instruments
 
 ProbeTab is an independent project. It is not affiliated with, or endorsed by,
-Vernier or Texas Instruments. The manual's page 1 states that LabPro is a
-registered trademark of Vernier Software & Technology and that CBL 2 is a
-trademark of Texas Instruments. The names appear here only to say which
-hardware ProbeTab works with.
+Vernier or Texas Instruments. As the manual's page 1 notes, LabPro belongs to
+Vernier Software & Technology as a registered trademark, and CBL 2 to Texas
+Instruments as a trademark. The names appear here only to say which hardware
+ProbeTab works with.
 
 ProbeTab's code is written from Vernier's published manual and from observing
 real hardware. Other LabPro projects are read for understanding, not copied.
