@@ -1,0 +1,4 @@
+# probetab-fixture 1
+# date: 2026-11-15T14:15:36-07:00
+# model: Command 7, the status request, as page 22 writes it for the serial port: s{7} then a carriage return. Whether USB takes the same bytes is for the bench to show. No reply is modelled.
+OUT 0 73 7b 37 7d 0d

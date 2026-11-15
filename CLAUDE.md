@@ -26,6 +26,11 @@ not the authority.
   its page and the words that state it, status `manual`.
 - It becomes `bench` only with a recorded trace.
 - Code and documents take values from that file and never retype them.
+- After changing it, run `python tools/generate.py`. The app's copy is
+  generated, and the gate fails until it matches.
+- Recordings of real sessions go in `protocol/traces/`, listed in its
+  `SHA256SUMS`. Hand-written traces go in `protocol/fixtures/`, and are never
+  evidence.
 
 ## Never commit
 

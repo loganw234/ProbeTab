@@ -31,11 +31,20 @@ Vernier's LabPro Technical Reference Manual, revision dated 08/02/02.
   manual's printed numbers.
 - The manual is not in this repository and is not to be added.
 
+## traces/ and fixtures/
+
+- [traces/](traces/FORMAT.md) holds recordings of real bench sessions, each
+  pinned by its SHA-256 in `traces/SHA256SUMS`. A fact becomes `bench` only by
+  naming one. There are none yet.
+- [fixtures/](fixtures/README.md) holds hand-written traces, the lead's model of
+  the device, for tests. They are not evidence.
+- [traces/FORMAT.md](traces/FORMAT.md) describes the format.
+  `tools/traces.py` defines it.
+
 ## Still to come
 
-- The protocol reference, written in this project's own words from the manual
-  and the bench.
-- The recorded traces that test it.
+The protocol reference, written in this project's own words from the manual and
+the bench.
 
 ## Licence
 

@@ -35,7 +35,7 @@ Everything else is a claim to be held against them:
 | `hardware/` | Bridge schematics, board files and enclosure | CERN-OHL-P-2.0 |
 | `protocol/` | LabPro facts, the protocol reference and recorded traces | CC-BY-4.0 |
 | `sensors/` | Sensor identification and calibration data | CC-BY-4.0 |
-| `tools/` | The gate, and bench scripts from Phase 0 | MIT |
+| `tools/` | The gate, the generator, the trace format, and bench scripts from Phase 0 | MIT |
 | `docs/` | Guides for teachers and builders | CC-BY-4.0 |
 <!-- folders:end -->
 

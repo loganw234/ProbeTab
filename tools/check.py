@@ -67,6 +67,8 @@ The checks, by name, each with what it cannot see:
              With no such file, the check is skipped by name.
              Limit: these are not caught:
                - a string that is split, encoded or spelled out;
+               - a home path through a WSL network share (wsl$ or
+                 wsl.localhost);
                - a hostname in another form;
                - a public IP address;
                - secrets of other shapes.
@@ -81,26 +83,55 @@ The checks, by name, each with what it cannot see:
              Limit: this describes `git commit` with no paths; `git commit -a`
              and `git commit <path>` take working-tree copies, which are what
              the checks read.
-  facts      protocol/labpro-facts.toml parses, and every fact in it (a table
-             holding no further tables) has:
+  facts      protocol/labpro-facts.toml parses, and every fact in it has:
                - a value;
                - a source listed under [source];
                - a page;
                - evidence of 16 to 200 characters;
                - a status, "manual" or "bench".
-             A bench fact names a file in protocol/traces/. Where the manual is
-             present with its pinned SHA-256 and pdftotext is found, each
-             fact's evidence must appear on its cited page, with runs of
-             whitespace collapsed; otherwise that part is skipped by name.
+             A fact is a table holding no further tables, as
+             tools/labpro_facts.py decides. A bench fact names a recording: a
+             file name in protocol/traces/, listed in SHA256SUMS with its hash,
+             that parses as a recording.
+             Where the manual is present with its pinned SHA-256 and pdftotext
+             is found, each fact's evidence must appear on its cited page, with
+             runs of whitespace collapsed; otherwise that part is skipped by
+             name.
              Limits:
                - whether a fact's value agrees with its evidence is not
                  checked;
-               - what a bench fact's trace holds is not checked, as what makes
-                 a file a recorded trace is not defined yet;
+               - whether a recording was recorded rather than written is not
+                 checked (see traces);
                - source tables are not checked beyond what the evidence check
                  uses;
                - matching depends on the pdftotext build, whose version is
                  printed; another build may lay a page out differently.
+  traces     protocol/traces/SHA256SUMS and the .trace files beside it agree in
+             both directions, and each listed file's bytes match its hash.
+             These must parse, as tools/traces.py defines the format:
+               - every .trace file in protocol/traces/, as a recording;
+               - every .trace file in protocol/fixtures/, as a fixture;
+               - the example in protocol/traces/FORMAT.md, as a recording.
+             Nothing else sits in either folder, apart from SHA256SUMS and
+             FORMAT.md in protocol/traces/ and README.md in protocol/fixtures/.
+             tools/traces.py's writer refuses what would not read back as
+             given, and --control holds it to that.
+             Limit: a fixture copied into protocol/traces/ with a recording's
+             header passes. Which traces were recorded is the lead's ledger's
+             record, not the gate's.
+  generated  app/src/generated/labpro-facts.ts is exactly what
+             tools/generate.py makes of protocol/labpro-facts.toml. Node loads
+             it and must find every fact's value, unit, channels, source, page
+             and status equal to the TOML's, type included: a boolean equals
+             only a boolean, and a string only a string.
+             With no node on PATH, that round trip is skipped by name. A Node
+             that cannot load .ts files fails it, naming its version.
+             Limits:
+               - JavaScript has one number type, so an integer and a
+                 whole-number float of the same value are the same to it, and
+                 to this check;
+               - TypeScript's types are not checked, as Node strips them;
+               - what the app does with the values is not checked.
 
 --history scans each commit in RANGE: its author and committer names and
 addresses, its message, and the lines it adds (a merge's, against its first
@@ -120,6 +151,7 @@ the gate is outside it; catching that is the job of a verifier and the owner.
 
 import argparse
 import hashlib
+import json
 import posixpath
 import re
 import shutil
@@ -129,8 +161,19 @@ import tempfile
 import tomllib
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import generate  # noqa: E402
+import labpro_facts  # noqa: E402
+import traces  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
-FACTS = "protocol/labpro-facts.toml"
+FACTS = labpro_facts.FACTS
+TRACES = "protocol/traces/"
+FIXTURES = "protocol/fixtures/"
+MANIFEST = TRACES + "SHA256SUMS"
+FORMAT_DOC = TRACES + "FORMAT.md"
+MANIFEST_LINE = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9._-]+\.trace)")
+EXAMPLE = re.compile(r"^```trace\n(.*?)^```", re.S | re.M)
 LICENCE_FILES = {
     "MIT": "LICENSE",
     "CC-BY-4.0": "LICENSE-DOCS-DATA",
@@ -195,6 +238,8 @@ class Context:
         self.reference_root = reference_root
         self.git_root = git_root
         self.pages = {}
+        self.render = generate.render  # a control may put a mutant here
+        self.files = []                # the real file set, for controls that build copies
 
 
 def tool(name):
@@ -409,24 +454,68 @@ def check_staged(root, files, ctx):
     return report
 
 
-def fact_tables(node, report, prefix=""):
-    """Yield (name, table) for each fact: a table that holds no further tables."""
-    if isinstance(node, list):
-        for index, item in enumerate(node):
-            yield from fact_tables(item, report, f"{prefix}[{index}]")
-        return
-    nested = {key for key, value in node.items()
-              if isinstance(value, dict)
-              or (isinstance(value, list) and value and all(isinstance(x, dict) for x in value))}
-    if not nested:
-        yield prefix, node
-        return
-    for key, value in node.items():
-        name = f"{prefix}.{key}" if prefix else key
-        if key not in nested:
-            report.fail(f"{name} sits outside any fact table")
-        elif not (prefix == "" and key == "source"):
-            yield from fact_tables(value, report, name)
+def trace_census(root, files):
+    """(listed, present, states, general).
+
+    listed:  what SHA256SUMS lists, name -> sha256.
+    present: the .trace files in protocol/traces/.
+    states:  each present file's problem, or None when it is a sound recording.
+    general: problems with the folder as a whole.
+    """
+    listed, general = {}, []
+    if MANIFEST in files:
+        text = (root / MANIFEST).read_bytes().decode("utf-8", errors="replace")
+        for number, line in enumerate(text.splitlines(), start=1):
+            match = MANIFEST_LINE.fullmatch(line)
+            if not match:
+                general.append(f"{MANIFEST}:{number}: not a '<sha256>  <name>.trace' line")
+            elif match.group(2) in listed:
+                general.append(f"{MANIFEST}:{number}: lists {match.group(2)} twice")
+            else:
+                listed[match.group(2)] = match.group(1)
+    else:
+        general.append(f"{MANIFEST} is missing")
+    for name in files:
+        if name.startswith(TRACES) and not name.endswith(".trace") and name not in (MANIFEST, FORMAT_DOC):
+            general.append(f"{name}: only recordings, SHA256SUMS and FORMAT.md belong in {TRACES}")
+    present, states = set(), {}
+    for name in files:
+        if not (name.startswith(TRACES) and name.endswith(".trace")):
+            continue
+        short = name[len(TRACES):]
+        if "/" in short:
+            general.append(f"{name}: recordings sit directly in {TRACES}, not in a folder under it")
+            continue
+        present.add(short)
+        data = (root / name).read_bytes()
+        if short in listed and hashlib.sha256(data).hexdigest() != listed[short]:
+            states[short] = "its bytes do not match SHA256SUMS"
+            continue
+        try:
+            trace = traces.parse(data.decode("utf-8"))
+        except UnicodeDecodeError:
+            states[short] = "it is not UTF-8 text"
+            continue
+        except traces.TraceError as exc:
+            states[short] = str(exc)
+            continue
+        states[short] = None if trace.kind == "trace" else \
+            f"it is a {trace.kind}, and only recordings belong in {TRACES}"
+    return listed, present, states, general
+
+
+def bench_problem(trace, census):
+    """Why a bench fact's trace is not a sound, listed recording, or None if it is one."""
+    listed, present, states, _ = census
+    if not isinstance(trace, str) or not trace.endswith(".trace") or "/" in trace or "\\" in trace:
+        return f"a bench fact's trace must be a file name in {TRACES}, and {trace!r} is not one"
+    if trace not in present:
+        return f"its trace {trace} is not in {TRACES}"
+    if trace not in listed:
+        return f"its trace {trace} is not listed in SHA256SUMS"
+    if states.get(trace):
+        return f"its trace {trace} is not a sound recording: {states[trace]}"
+    return None
 
 
 def manual_pages(key, source, ctx, report):
@@ -473,7 +562,8 @@ def check_facts(root, files, ctx):
         report.fail(f"{FACTS} does not parse: {exc}")
         return report
     sources = data.get("source", {})
-    facts = list(fact_tables(data, report))
+    facts = labpro_facts.facts(data, stray=lambda name: report.fail(f"{name} sits outside any fact table"))
+    census = trace_census(root, files)
     usable = []
     shortest, longest = EVIDENCE_LENGTH
     for name, fact in facts:
@@ -486,9 +576,10 @@ def check_facts(root, files, ctx):
             continue
         if fact["status"] not in STATUSES:
             report.fail(f"{name}: its status {fact['status']!r} is neither manual nor bench")
-        elif fact["status"] == "bench" and f"protocol/traces/{fact.get('trace', '')}" not in files:
-            report.fail(f"{name}: a bench fact must name a trace in protocol/traces/, "
-                        f"and {fact.get('trace')!r} is not one")
+        elif fact["status"] == "bench":
+            problem = bench_problem(fact.get("trace"), census)
+            if problem:
+                report.fail(f"{name}: {problem}")
         length = len(collapse(str(fact["evidence"])))
         if length < shortest:
             report.fail(f"{name}: its evidence is too short to place on a page (under {shortest} characters)")
@@ -520,6 +611,105 @@ def check_facts(root, files, ctx):
             where = f"it is on page {', '.join(elsewhere)}" if elsewhere else "it is on no page"
             report.fail(f"{name}: its evidence is not on page {page}; {where}")
     report.note(f"{len(facts)} facts, {found} found on their cited pages")
+    return report
+
+
+def check_traces(root, files, ctx):
+    report = Report("traces")
+    listed, present, states, general = trace_census(root, files)
+    for message in general:
+        report.fail(message)
+    for name in sorted(present - listed.keys()):
+        report.fail(f"{TRACES}{name}: not listed in SHA256SUMS")
+    for name in sorted(listed.keys() - present):
+        report.fail(f"SHA256SUMS lists {name}, which is not in {TRACES}")
+    for name in sorted(present):
+        if states.get(name):
+            report.fail(f"{TRACES}{name}: {states[name]}")
+    for name in files:
+        if name.startswith(FIXTURES) and not name.endswith(".trace") and name != FIXTURES + "README.md":
+            report.fail(f"{name}: only fixtures and README.md belong in {FIXTURES}")
+    fixtures = [name for name in files if name.startswith(FIXTURES) and name.endswith(".trace")]
+    for name in fixtures:
+        try:
+            fixture = traces.parse((root / name).read_bytes().decode("utf-8"))
+        except (UnicodeDecodeError, traces.TraceError) as exc:
+            report.fail(f"{name}: {exc}")
+            continue
+        if fixture.kind != "fixture":
+            report.fail(f"{name}: it is a {fixture.kind}, and only fixtures belong in {FIXTURES}")
+    examples = []
+    if FORMAT_DOC not in files:
+        report.fail(f"{FORMAT_DOC} is missing")
+    else:
+        examples = EXAMPLE.findall((root / FORMAT_DOC).read_bytes().decode("utf-8", errors="replace"))
+        if not examples:
+            report.fail(f"{FORMAT_DOC} has no trace example to check")
+        for example in examples:
+            try:
+                parsed = traces.parse(example)
+            except traces.TraceError as exc:
+                report.fail(f"{FORMAT_DOC}: its example does not parse: {exc}")
+                continue
+            if parsed.kind != "trace":
+                report.fail(f"{FORMAT_DOC}: its example is a {parsed.kind}, not a recording")
+    def count(number, noun):
+        return f"{number} {noun}{'' if number == 1 else 's'}"
+
+    report.note(f"{count(len(present), 'recording')}, {count(len(fixtures), 'fixture')}, "
+                f"{count(len(examples), 'example')} in {FORMAT_DOC}")
+    return report
+
+
+def same_value(got, want):
+    """Equal as the app sees them: a boolean equals only a boolean, and a string only a string.
+    JavaScript has one number type, so an int and a float of the same value are one number."""
+    if isinstance(got, bool) or isinstance(want, bool):
+        return type(got) is type(want) and got == want
+    if isinstance(got, (int, float)) and isinstance(want, (int, float)):
+        return got == want
+    return type(got) is type(want) and got == want
+
+
+def same_fact(got, want):
+    return (isinstance(got, dict) and isinstance(want, dict) and got.keys() == want.keys()
+            and all(same_value(got[key], want[key]) for key in want))
+
+
+def check_generated(root, files, ctx):
+    report = Report("generated")
+    output = generate.OUTPUT
+    try:
+        data = labpro_facts.load(root)
+        expected = ctx.render(data)
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError, generate.Refused) as exc:
+        report.fail(f"the generator cannot run: {exc}")
+        return report
+    if output not in files:
+        report.fail(f"{output} is missing; run python tools/generate.py")
+        return report
+    if (root / output).read_bytes() != expected.encode("utf-8"):
+        report.fail(f"{output} differs from what tools/generate.py makes of {FACTS}; run python tools/generate.py")
+    node = tool("node")
+    if not node:
+        report.skip("the round trip through Node is not checked: node is not on PATH")
+        return report
+    version = subprocess.run([node, "--version"], capture_output=True).stdout.decode("ascii", errors="replace").strip()
+    script = ("import(process.argv[1]).then(m => process.stdout.write(JSON.stringify(m.LABPRO_FACTS)),"
+              " e => { process.stderr.write(String(e)); process.exit(1); })")
+    loaded = subprocess.run([node, "-e", script, (root / output).resolve().as_uri()], capture_output=True)
+    if loaded.returncode != 0:
+        report.fail(f"node {version} could not load {output}; the round trip needs a Node that loads .ts "
+                    f"files by stripping types: {loaded.stderr.decode('utf-8', errors='replace').strip()[:300]}")
+        return report
+    got = json.loads(loaded.stdout.decode("utf-8"))
+    want = {name: {field: fact.get(field) for field in generate.FIELDS}
+            for name, fact in labpro_facts.facts(data)}
+    for name in sorted(set(got) | set(want)):
+        if not same_fact(got.get(name), want.get(name)):
+            report.fail(f"round trip: {name} loads from {output} as {got.get(name)!r}, "
+                        f"but {FACTS} has {want.get(name)!r}")
+    report.note(f"{len(want)} facts loaded back through node {version} ({node})")
     return report
 
 
@@ -572,6 +762,8 @@ CHECKS = {
     "eol": check_eol,
     "staged": check_staged,
     "facts": check_facts,
+    "traces": check_traces,
+    "generated": check_generated,
 }
 
 
@@ -770,6 +962,158 @@ def plant_unlisted_source(root, files, ctx):
     return files
 
 
+RECORDING_HEADER = {"date": "2026-11-20T14:03:11-07:00", "os": "planted os",
+                    "stack": "planted stack", "firmware": "unknown"}
+
+
+def plant_recording(root, name="planted.trace", listed=True, text=None):
+    """A recording in the copy's protocol/traces/, listed in SHA256SUMS unless told otherwise."""
+    text = text or traces.write("trace", RECORDING_HEADER, [("OUT", 0, b"s{7}\r"), ("IN", 1532, b"{ 1.0}\r")])
+    append(root, TRACES + name, text)
+    if listed:
+        append(root, MANIFEST, f"{hashlib.sha256(text.encode('utf-8')).hexdigest()}  {name}\n")
+    return name
+
+
+def plant_changed_recording(root, files, ctx):
+    name = plant_recording(root)
+    path = root / TRACES / name
+    path.write_bytes(path.read_bytes().replace(b" 0d\n", b" 0a\n", 1))
+    return walked_files(root)
+
+
+def plant_odd_hex(root, files, ctx):
+    sound = traces.write("trace", RECORDING_HEADER, [("OUT", 0, b"s")])
+    plant_recording(root, "odd.trace", text=sound.replace("OUT 0 73", "OUT 0 7"))
+    return walked_files(root)
+
+
+def plant_host_header(root, files, ctx):
+    sound = traces.write("trace", RECORDING_HEADER, [("OUT", 0, b"s")])
+    plant_recording(root, "host.trace",
+                    text=sound.replace("# firmware: unknown\n", "# firmware: unknown\n# host: planted-bench\n"))
+    return walked_files(root)
+
+
+def plant_unlisted_recording(root, files, ctx):
+    plant_recording(root, "unlisted.trace", listed=False)
+    return walked_files(root)
+
+
+def plant_ghost_listing(root, files, ctx):
+    append(root, MANIFEST, "0" * 64 + "  ghost.trace\n")
+    return walked_files(root)
+
+
+def plant_fixture_among_recordings(root, files, ctx):
+    fixtures = sorted((root / FIXTURES).glob("*.trace"))
+    if not fixtures:
+        raise Unplantable(f"no fixture in {FIXTURES} to copy")
+    plant_recording(root, fixtures[0].name, text=fixtures[0].read_bytes().decode("utf-8"))
+    return walked_files(root)
+
+
+def plant_recording_among_fixtures(root, files, ctx):
+    append(root, FIXTURES + "recorded.trace", traces.write("trace", RECORDING_HEADER, [("OUT", 0, b"s")]))
+    return walked_files(root)
+
+
+def plant_stray_among_recordings(root, files, ctx):
+    append(root, TRACES + "session-notes.txt", "planted\n")
+    return walked_files(root)
+
+
+def plant_stray_among_fixtures(root, files, ctx):
+    append(root, FIXTURES + "sketch.bin", b"planted\n")
+    return walked_files(root)
+
+
+def plant_broken_example(root, files, ctx):
+    edit(root, FORMAT_DOC, r"OUT 0 73 7b 37 7d 0d", "OUT 0 73 7b 3 7d 0d", within="```trace")
+    return files
+
+
+def plant_hand_edited_generated(root, files, ctx):
+    edit(root, generate.OUTPUT, r"value: 2295,", "value: 2296,", within='"usb.vendor_id"')
+    return files
+
+
+def plant_bench_fact_on_fixture(root, files, ctx):
+    edit(root, FACTS, r'status = "manual"', 'status = "bench"\ntrace = "../fixtures/status-request.trace"',
+         within=FACT)
+    return files
+
+
+def plant_bench_fact_on_missing_name(root, files, ctx):
+    edit(root, FACTS, r'status = "manual"', 'status = "bench"\ntrace = "nonexistent.trace"', within=FACT)
+    return files
+
+
+def plant_bench_fact_on_fixture_name(root, files, ctx):
+    edit(root, FACTS, r'status = "manual"', 'status = "bench"\ntrace = "status-request.trace"', within=FACT)
+    return files
+
+
+def plant_bench_fact_on_unlisted(root, files, ctx):
+    name = plant_recording(root, "unlisted.trace", listed=False)
+    edit(root, FACTS, r'status = "manual"', f'status = "bench"\ntrace = "{name}"', within=FACT)
+    return walked_files(root)
+
+
+def plant_bench_fact_on_changed(root, files, ctx):
+    name = plant_recording(root)
+    path = root / TRACES / name
+    path.write_bytes(path.read_bytes().replace(b" 0d\n", b" 0a\n", 1))
+    edit(root, FACTS, r'status = "manual"', f'status = "bench"\ntrace = "{name}"', within=FACT)
+    return walked_files(root)
+
+
+def plant_duplicate_listing(root, files, ctx):
+    plant_recording(root)
+    last = (root / MANIFEST).read_bytes().decode("utf-8").split("\n")[-2]
+    append(root, MANIFEST, last + "\n")
+    return walked_files(root)
+
+
+def plant_recording_in_subfolder(root, files, ctx):
+    append(root, TRACES + "old/sub.trace", traces.write("trace", RECORDING_HEADER, [("OUT", 0, b"s")]))
+    return walked_files(root)
+
+
+def plant_malformed_listing(root, files, ctx):
+    append(root, MANIFEST, "not-a-hash  planted.trace\n")
+    return walked_files(root)
+
+
+def plant_example_as_fixture(root, files, ctx):
+    path = root / FORMAT_DOC
+    fixture = traces.write("fixture", {"date": RECORDING_HEADER["date"], "model": "planted"}, [("OUT", 0, b"s")])
+    changed, count = EXAMPLE.subn(lambda match: "```trace\n" + fixture + "```",
+                                  path.read_bytes().decode("utf-8"), count=1)
+    if not count:
+        raise RuntimeError(f"control cannot be planted: {FORMAT_DOC} has no example")
+    path.write_bytes(changed.encode("utf-8"))
+    return files
+
+
+def plant_date_with_space(root, files, ctx):
+    sound = traces.write("trace", RECORDING_HEADER, [("OUT", 0, b"s")])
+    plant_recording(root, "spaced.trace", text=sound.replace("2026-11-20T14:03:11", "2026-11-20 14:03:11"))
+    return walked_files(root)
+
+
+def plant_unprintable_header(root, files, ctx):
+    sound = traces.write("trace", RECORDING_HEADER, [("OUT", 0, b"s")])
+    plant_recording(root, "unprintable.trace",
+                    text=sound.replace("# os: planted os", "# os: planted" + chr(0x2028) + "os"))
+    return walked_files(root)
+
+
+def plant_unsafe_integer(root, files, ctx):
+    edit(root, FACTS, r"value = 0x08F7", "value = 9007199254740993", within=FACT)
+    return files
+
+
 CONTROLS = [
     ("layout", "a folder with no row", plant_unlisted_folder, "folder zz-planted/"),
     ("layout", "a row with no folder", plant_row_without_folder, "row for docs/"),
@@ -802,6 +1146,42 @@ CONTROLS = [
     ("facts", "evidence cited to the wrong page", plant_wrong_page, "usb.vendor_id: its evidence is not on page 23"),
     ("facts", "a bench fact with no trace", plant_bench_without_trace, "usb.vendor_id: a bench fact"),
     ("facts", "a source not listed", plant_unlisted_source, "usb.vendor_id: its source 'planted'"),
+    ("facts", "a bench fact on a fixture", plant_bench_fact_on_fixture,
+     "'../fixtures/status-request.trace' is not one"),
+    ("traces", "a recording changed after listing", plant_changed_recording,
+     "planted.trace: its bytes do not match"),
+    ("traces", "a byte of one hex digit", plant_odd_hex, "'7' is not a byte"),
+    ("traces", "a header carrying a host", plant_host_header, "unknown header key 'host'"),
+    ("traces", "a recording not listed", plant_unlisted_recording, "unlisted.trace: not listed in SHA256SUMS"),
+    ("traces", "a listing with no recording", plant_ghost_listing, "SHA256SUMS lists ghost.trace"),
+    ("traces", "a fixture among the recordings", plant_fixture_among_recordings,
+     "it is a fixture, and only recordings belong"),
+    ("traces", "a recording among the fixtures", plant_recording_among_fixtures,
+     "recorded.trace: it is a trace, and only fixtures belong"),
+    ("traces", "a stray file among the recordings", plant_stray_among_recordings,
+     "session-notes.txt: only recordings, SHA256SUMS and FORMAT.md belong"),
+    ("traces", "a stray file among the fixtures", plant_stray_among_fixtures,
+     "sketch.bin: only fixtures and README.md belong"),
+    ("traces", "FORMAT.md's example broken", plant_broken_example, "its example does not parse"),
+    ("generated", "a hand-edited generated file", plant_hand_edited_generated,
+     "differs from what tools/generate.py makes"),
+    ("facts", "a bench fact on a name with no file", plant_bench_fact_on_missing_name,
+     "its trace nonexistent.trace is not in protocol/traces/"),
+    ("facts", "a bench fact on the fixture's bare name", plant_bench_fact_on_fixture_name,
+     "its trace status-request.trace is not in protocol/traces/"),
+    ("facts", "a bench fact on an unlisted recording", plant_bench_fact_on_unlisted,
+     "its trace unlisted.trace is not listed in SHA256SUMS"),
+    ("facts", "a bench fact on a changed recording", plant_bench_fact_on_changed,
+     "its trace planted.trace is not a sound recording"),
+    ("traces", "a recording listed twice", plant_duplicate_listing, "lists planted.trace twice"),
+    ("traces", "a recording in a subfolder", plant_recording_in_subfolder, "recordings sit directly in"),
+    ("traces", "a malformed manifest line", plant_malformed_listing, "not a '<sha256>  <name>.trace' line"),
+    ("traces", "FORMAT.md's example as a fixture", plant_example_as_fixture,
+     "its example is a fixture, not a recording"),
+    ("traces", "a date with a space for its T", plant_date_with_space, "does not read YYYY-MM-DDTHH:MM:SS+HH:MM"),
+    ("traces", "a header value that is not printable", plant_unprintable_header, "not printable text"),
+    ("generated", "an integer beyond JavaScript's safe ones", plant_unsafe_integer,
+     "beyond the integers JavaScript holds exactly"),
 ]
 
 
@@ -865,7 +1245,66 @@ def build_empty_range(base, ctx):
     return check_history("HEAD..HEAD", ctx, repo=repo)
 
 
-REPOSITORY_CONTROLS = [
+def build_generated_mutant(base, ctx):
+    """A generator that writes one value wrong, consistently: the file matches the generator,
+    so only the round trip through Node can see it."""
+    root = copy_files(ctx.files, base / "generated-mutant")
+    good = generate.render(labpro_facts.load(root))
+    bad = good.replace("value: 2295,", "value: 2296,", 1)
+    if bad == good:
+        raise RuntimeError("control cannot be planted: no 'value: 2295,' in the generated text")
+    (root / generate.OUTPUT).write_bytes(bad.encode("utf-8"))
+    mutant = Context(ctx.reference_root, ctx.git_root)
+    mutant.render = lambda data: bad
+    return check_generated(root, walked_files(root), mutant)
+
+
+def build_generated_boolean_mutant(base, ctx):
+    """A generator that writes true where the TOML has 1, consistently: equal in Python, not to the app."""
+    root = copy_files(ctx.files, base / "generated-boolean")
+    good = generate.render(labpro_facts.load(root))
+    target = '"usb.product_id": Object.freeze({ value: 1,'
+    bad = good.replace(target, target.replace("value: 1,", "value: true,"), 1)
+    if bad == good:
+        raise RuntimeError("control cannot be planted: no usb.product_id with value 1 in the generated text")
+    (root / generate.OUTPUT).write_bytes(bad.encode("utf-8"))
+    mutant = Context(ctx.reference_root, ctx.git_root)
+    mutant.render = lambda data: bad
+    return check_generated(root, walked_files(root), mutant)
+
+
+def build_write_refusals(base, ctx):
+    """tools/traces.py's writer must refuse what would not read back as given."""
+    report = Report("traces")
+    cases = (("a value holding a line break", dict(RECORDING_HEADER, os="planted\n# note: smuggled")),
+             ("a value that is not text", dict(RECORDING_HEADER, os=5)))
+    for label, header in cases:
+        try:
+            traces.write("trace", header, [("OUT", 0, b"s")])
+        except ValueError as exc:
+            report.fail(f"traces.write refused {label}: {exc}")
+    return report
+
+
+def build_bench_fact_on_recording(base, ctx):
+    """A bench fact naming a sound, listed recording: the bench rule must let it pass."""
+    root = copy_files(ctx.files, base / "bench-recording")
+    name = plant_recording(root)
+    edit(root, FACTS, r'status = "manual"', f'status = "bench"\ntrace = "{name}"', within=FACT)
+    return check_facts(root, walked_files(root), ctx)
+
+
+BUILT_CONTROLS = [
+    ("generated", "a generator that writes a wrong value consistently", build_generated_mutant, "fail",
+     "round trip: usb.vendor_id loads"),
+    ("facts", "a bench fact on a sound, listed recording", build_bench_fact_on_recording, "clean",
+     "usb.vendor_id"),
+    ("generated", "a generator that writes true for 1, consistently", build_generated_boolean_mutant, "fail",
+     "round trip: usb.product_id loads"),
+    ("traces", "traces.write given a value holding a line break", build_write_refusals, "fail",
+     "refused a value holding a line break"),
+    ("traces", "traces.write given a value that is not text", build_write_refusals, "fail",
+     "refused a value that is not text"),
     ("staged", "a staged copy changed afterwards", build_staged, "fail",
      "notes.txt: its staged copy differs"),
     ("history", "a home path added by a commit", build_linear_history, "fail",
@@ -891,8 +1330,10 @@ def copy_files(files, destination):
 
 def run_controls(files, ctx, require_all):
     print()
-    print("Controls: each plants one fault; the check named must catch it, for the reason named.")
-    missed = skipped = named_skips = 0
+    print("Controls: each plants a fault the check named must catch, for the reason named,")
+    print("or, where it says so, a sound case the check must pass.")
+    missed = skipped = named_skips = cleans = 0
+    ctx.files = files
     with tempfile.TemporaryDirectory(prefix="probetab-control-") as tmp:
         base = Path(tmp)
         baseline_root = copy_files(files, base / "baseline")
@@ -923,10 +1364,19 @@ def run_controls(files, ctx, require_all):
                 got = report.fails[0] if report.fails else "the check passed"
                 print(f"  MISSED {name:<9} {title}: expected a failure containing {expect!r}; got: {got}")
         built = {}
-        for name, title, build, outcome, expect in REPOSITORY_CONTROLS:
+        for name, title, build, outcome, expect in BUILT_CONTROLS:
             if build not in built:
                 built[build] = build(base, ctx)
             report = built[build]
+            if outcome == "clean":
+                wrong = [message for message in report.fails if expect in message]
+                if wrong:
+                    missed += 1
+                    print(f"  MISSED {name:<9} {title}: expected no failure naming {expect!r}; got: {wrong[0]}")
+                else:
+                    cleans += 1
+                    print(f"  passed {name:<9} {title}: no failure names {expect}")
+                continue
             pool = report.fails if outcome == "fail" else report.skips
             hits = [message for message in pool if expect in message]
             verb = "caught" if outcome == "fail" else "skipped"
@@ -937,15 +1387,15 @@ def run_controls(files, ctx, require_all):
                 missed += 1
                 print(f"  MISSED {name:<9} {title}: expected a {outcome} containing {expect!r}; "
                       f"got fails {report.fails[:1]} and skips {report.skips[:1]}")
-    total = len(CONTROLS) + len(REPOSITORY_CONTROLS)
-    caught = total - missed - skipped - named_skips
+    total = len(CONTROLS) + len(BUILT_CONTROLS)
+    caught = total - missed - skipped - named_skips - cleans
     if missed or (skipped and require_all):
-        print(f"CONTROLS: FAIL ({caught} caught, {named_skips} skipped as named, {missed} missed, "
-              f"{skipped} not exercised, of {total})")
+        print(f"CONTROLS: FAIL ({caught} caught, {named_skips} skipped as named, {cleans} passed as named, "
+              f"{missed} missed, {skipped} not exercised, of {total})")
         return True
     suffix = f"; {skipped} not exercised" if skipped else ""
     print(f"CONTROLS: PASS ({total - skipped} of {total} behaved as named: {caught} caught, "
-          f"{named_skips} skipped as named{suffix})")
+          f"{named_skips} skipped as named, {cleans} passed as named{suffix})")
     return False
 
 
