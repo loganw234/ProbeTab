@@ -1,0 +1,13 @@
+ProbeTab hardware: CERN-OHL-P v2
+
+Copyright (c) 2026 Logan W.
+
+The files in the folders that README.md's folder table marks CERN-OHL-P-2.0
+are licensed under the CERN Open Hardware Licence Version 2 - Permissive
+(CERN-OHL-P-2.0). That table is the one statement of which folder has which
+licence. The licence's text:
+
+    https://spdx.org/licenses/CERN-OHL-P-2.0.html
+
+No folder holds design files yet. The licence's full text is added to the
+repository with the first one.

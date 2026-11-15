@@ -1,0 +1,7 @@
+# Reference material is read locally and never published. Vernier's manual is
+# Vernier's; tools/check.py also refuses any PDF and the manual's exact bytes.
+*.pdf
+
+# Tool output.
+__pycache__/
+node_modules/

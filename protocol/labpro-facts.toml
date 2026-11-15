@@ -1,0 +1,228 @@
+# protocol/labpro-facts.toml
+#
+# The single source for facts about the LabPro. Code and documents take values
+# from here, or from files generated from here; they do not restate them.
+#
+# Each fact is a table with:
+#   value     the fact
+#   unit      what the value measures, where it has a unit
+#   source    a key under [source]
+#   page      the source's PDF page; on the pages cited here the manual's
+#             printed page numbers match
+#   evidence  the words on that page that state the fact; tools/check.py finds
+#             them on the page when the manual is present
+#   status    "manual": read from the source, not yet seen on a bench
+#             "bench":  confirmed on a LabPro; `trace` names the recorded trace
+#             in protocol/traces/
+#   note      what a reader would otherwise get wrong
+#
+# A fact moves from "manual" to "bench" only with a recorded trace.
+
+[source.trm]
+title = "LabPro Technical Reference Manual"
+publisher = "Vernier Software & Technology"
+revision = "08/02/02"
+bytes = 414165
+sha256 = "41c66c8daaf359dc423959b17191d372cb77d9ce51d160317d5bf63188d289cd"
+local = "labpro_tech_manual.pdf"
+url = "http://www2.vernier.com/labpro/labpro_tech_manual.pdf"
+note = "The owner's copy, kept in the repository folder and ignored by git; never committed. The URL is where the project outline cites the manual; the pinned copy was not fetched from it. The revision is the date in the manual's page headers."
+
+# USB
+
+[usb.vendor_id]
+value = 0x08F7
+source = "trm"
+page = 22
+evidence = "The LabPro enumerates with VID=08f7 and PID=0x0001."
+status = "manual"
+
+[usb.product_id]
+value = 0x0001
+source = "trm"
+page = 22
+evidence = "The LabPro enumerates with VID=08f7 and PID=0x0001."
+status = "manual"
+
+[usb.bulk_in_endpoints]
+value = 1
+source = "trm"
+page = 22
+evidence = "There is 1 input bulk endpoint and 1 output bulk endpoint."
+status = "manual"
+
+[usb.bulk_out_endpoints]
+value = 1
+source = "trm"
+page = 22
+evidence = "There is 1 input bulk endpoint and 1 output bulk endpoint."
+status = "manual"
+
+[usb.packet_size]
+value = 64
+unit = "bytes"
+source = "trm"
+page = 22
+evidence = "The USB packet size for bulk transfers is 64 bytes."
+status = "manual"
+
+[usb.in_transfer_multiple]
+value = 64
+unit = "bytes"
+source = "trm"
+page = 22
+evidence = "Transfers from LabPro to PC are always in multiples of 64 bytes."
+status = "manual"
+note = "So the last packet of a reply can carry bytes past its end. Page 23: in ASCII mode a reader stops at the carriage return; in binary mode it counts the samples it asked for."
+
+# Ports and converter
+
+[ports.analog]
+value = 4
+source = "trm"
+page = 6
+evidence = "The ports labeled CH1 through CH4 are used to collect"
+status = "manual"
+
+[ports.digital]
+value = 2
+source = "trm"
+page = 6
+evidence = "The ports labeled DIG/SONIC1 and DIG/SONIC2 are used to collect digital data"
+status = "manual"
+
+[adc.bits]
+value = 12
+source = "trm"
+page = 74
+evidence = "12-bit Successive Approximation ADC"
+status = "manual"
+
+# Sampling. The manual has two modes: real time (RT), where each sample is
+# sent as it is taken, and non-real time (NRT), where samples are stored in the
+# LabPro and fetched afterwards. The project outline's "burst capture" is NRT.
+
+[buffer.points]
+value = 12000
+unit = "samples, shared by the active channels"
+source = "trm"
+page = 24
+evidence = "the number of data points being collected is limited to 12k samples/# of channels."
+status = "manual"
+
+[realtime.usb_max_rate]
+value = 1000
+unit = "samples per second, 1 to 6 channels"
+source = "trm"
+page = 24
+evidence = "we should have a limit of 1k samples per second for RT mode for 1 to 6 channels active."
+status = "manual"
+note = "The manual's estimate for an unloaded USB bus, not a measurement. Page 23 says real-time binary data goes one sample per 64-byte USB packet by default, roughly 1 sample/ms; that this is the reason for the limit is the lead's reading."
+
+[[realtime.serial_max_rate]]
+channels = "1"
+value = 500
+unit = "samples per second"
+source = "trm"
+page = 23
+evidence = "500 samples per second max. 1 channel active"
+status = "manual"
+
+[[realtime.serial_max_rate]]
+channels = "2 - 4"
+value = 250
+unit = "samples per second"
+source = "trm"
+page = 23
+evidence = "250 samples per second max. 2 - 4 channels active"
+status = "manual"
+
+[[realtime.serial_max_rate]]
+channels = "4 - 6"
+value = 200
+unit = "samples per second"
+source = "trm"
+page = 23
+evidence = "200 samples per second max. 4 - 6 channels active"
+status = "manual"
+note = "The table names 4 channels in two rows. Computed by the lead, 2026-11-15: by the page's own arithmetic (2 x channels + 5 bytes a point, at 3840 bytes a second) 5 channels allow 256 points a second, so 250 would hold up to 5 channels and only 6 would need 200. The bench decides."
+
+[[non_realtime.max_rate]]
+channels = "1"
+value = 50000
+unit = "samples per second"
+source = "trm"
+page = 24
+evidence = "50K samples per second max. 1 channel active"
+status = "manual"
+
+[[non_realtime.max_rate]]
+channels = "2"
+value = 5000
+unit = "samples per second"
+source = "trm"
+page = 24
+evidence = "5k samples per second max. 2 channels active"
+status = "manual"
+
+[[non_realtime.max_rate]]
+channels = "3 - 4"
+value = 2500
+unit = "samples per second"
+source = "trm"
+page = 24
+evidence = "2.5k samples per second max. 3-4 channels active"
+status = "manual"
+
+[[non_realtime.max_rate]]
+channels = "5"
+value = 2000
+unit = "samples per second"
+source = "trm"
+page = 24
+evidence = "2k samples per second max. 5 channels active"
+status = "manual"
+
+[[non_realtime.max_rate]]
+channels = "6"
+value = 1000
+unit = "samples per second"
+source = "trm"
+page = 24
+evidence = "1k samples per second max. 6 channels active"
+status = "manual"
+
+# Power. The specification table on page 74 lists its labels and its values
+# in two columns that text extraction misaligns. Each pairing below is the
+# lead's reading of the table's order, and is a verifier's item until the
+# bench or a rendering of the page confirms it.
+
+[power.supply]
+value = "6 V DC regulated, 600 mA, or four AA alkaline cells"
+source = "trm"
+page = 74
+evidence = "6VDC reg, 600mA or 4AA Alkaline Batteries"
+status = "manual"
+
+[power.jack]
+value = "2.1 mm, center negative"
+source = "trm"
+page = 74
+evidence = "2.1mm Power Jack, center negative"
+status = "manual"
+
+[sensor_supply.volts]
+value = 5.3
+unit = "volts, nominal"
+source = "trm"
+page = 74
+evidence = "5.3VDC (nominal). 180mA max."
+status = "manual"
+
+[sensor_supply.max_current]
+value = 180
+unit = "milliamps"
+source = "trm"
+page = 74
+evidence = "5.3VDC (nominal). 180mA max."
+status = "manual"

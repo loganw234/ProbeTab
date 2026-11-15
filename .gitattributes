@@ -1,0 +1,5 @@
+# No end-of-line conversion on check-in or checkout. Recorded traces and their
+# SHA-256 manifests are over exact bytes, and a conversion would change the
+# bytes a hash was taken over. Line endings are held by the gate instead:
+# tools/check.py refuses a carriage return in any file it checks.
+* -text

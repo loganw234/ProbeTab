@@ -1,0 +1,15 @@
+ProbeTab documents and data: CC BY 4.0
+
+Copyright (c) 2026 Logan W.
+
+The files in the folders that README.md's folder table marks CC-BY-4.0 are
+licensed under the Creative Commons Attribution 4.0 International licence
+(CC BY 4.0). That table is the one statement of which folder has which
+licence. The licence's legal code:
+
+    https://spdx.org/licenses/CC-BY-4.0.html
+
+Excepted: the evidence phrases in protocol/labpro-facts.toml are short
+quotations from Vernier's LabPro Technical Reference Manual, each cited to its
+page. They remain Vernier's and are not licensed here. The manual itself is not
+in this repository.
