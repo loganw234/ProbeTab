@@ -12,7 +12,11 @@
   that decides which tables are facts, and Python tools read values through it.
 - [traces.py](traces.py) defines the trace format: it reads, writes and checks
   traces.
-- [bench/](bench/README.md) holds the bench script for Phase 0's first contact
-  with a LabPro, the fake LabPro its tests run against, and how to set both up.
+- [bench/](bench/README.md) holds the tools for Phase 0's first contact with a
+  LabPro:
+  - the bench script, and the fake LabPro its tests run against;
+  - the browser bench page's server, and the converter from its records to
+    traces;
+  - how to set them up.
 
 Its licence is the one the folder table in [README.md](../README.md) gives it.

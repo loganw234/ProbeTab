@@ -239,18 +239,15 @@ def bulk_pair(device, facts):
 
 
 def string_of(device, index):
-    """A string descriptor's text, with spaces at either end removed: none when there is no string or
-    it is blank, and unreadable when it cannot be read or holds a character that is not printable."""
+    """A string descriptor's text as tools/traces.py's device_string records it: none when there is
+    no string, and unreadable when it cannot be read."""
     if not index:
         return "none"
     try:
         text = usb.util.get_string(device, index)
     except (usb.core.USBError, ValueError):
         return "unreadable"
-    text = (text or "").strip()
-    if not text:
-        return "none"
-    return text if text.isprintable() else "unreadable"
+    return traces.device_string(text)
 
 
 def read_descriptors(device):

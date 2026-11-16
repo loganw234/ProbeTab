@@ -10,9 +10,10 @@ The browser app. It will hold:
 
 It is written in the TypeScript that Node's type stripping accepts: erasable
 syntax only, so no enums, namespaces or parameter properties, and imports that
-name their `.ts` files. There is no build step yet.
+name their `.ts` files. The tests run the `.ts` files as they are. The bench
+page runs a build of them, which tsc makes (see [The bench page](#the-bench-page)).
 
-## What is here (2026-11-15)
+## What is here (2026-11-16)
 
 - [src/transport/transport.ts](src/transport/transport.ts): the transport
   interface. A transport opens, closes, writes bytes, and reads the next bytes
@@ -24,12 +25,25 @@ name their `.ts` files. There is no build step yet.
   - It closes the device again when it refuses one.
   - It clears a stalled endpoint's halt before it refuses the transfer.
   - It is first exercised on real hardware at Phase 0.
-- [src/protocol/status.ts](src/protocol/status.ts): Command 7 and its reply, as
-  the bench script sends and reads them, through any transport.
+- [src/protocol/status.ts](src/protocol/status.ts): the commands the bench
+  script sends, and their replies, through any transport. These are Command 7,
+  Command 0, Command 1 and Command 9, and the system state decoded as page 45
+  of the manual gives it.
 - [src/protocol/facts.ts](src/protocol/facts.ts) reads the facts from
   [src/generated/labpro-facts.ts](src/generated/labpro-facts.ts).
   - `tools/generate.py` makes that file from `protocol/labpro-facts.toml`.
   - Never edit it by hand.
+- [src/bench/](src/bench/) is the bench page's code:
+  - [session.ts](src/bench/session.ts) takes the bench script's steps, with its
+    refusals and its discard: the status, the guarded reset, channel 1,
+    Command 9, and the live reading.
+  - [record.ts](src/bench/record.ts) keeps every transfer for the record the
+    page saves. It also gives the device's strings, the serial number masked,
+    and the platform and browser from the browser's own hints.
+  - [page.ts](src/bench/page.ts) is the glue to the page: its buttons, its log
+    and its Save.
+- [bench/index.html](bench/index.html) is the page, and
+  [tsconfig.build.json](tsconfig.build.json) is how it is built.
 - [test/](test/) runs it all on Node. It uses
   [a simulated LabPro](test/fake-labpro.ts), which replays a fixture from
   `protocol/fixtures/` through [a generated copy](test/generated/fixtures.ts).
@@ -40,7 +54,7 @@ name their `.ts` files. There is no build step yet.
 The tests need only Node with type stripping, which Node 22.19 has by default.
 From the repository's root:
 
-    node --test app/test/memory.test.ts app/test/status.test.ts app/test/webusb.test.ts
+    node --test app/test/memory.test.ts app/test/status.test.ts app/test/webusb.test.ts app/test/bench.test.ts
 
 The gate's `app` check runs each `app/test/*.test.ts` alone, in a node process
 of its own, and requires node's summary from each. A file that holds no tests,
@@ -55,27 +69,90 @@ That installs the one package into `node_modules/`, which git ignores. The
 types check reads `src/` only. The tests would need Node's own types, which are
 not installed.
 
+## The bench page
+
+For Phase 0: the bench script's steps from a browser, over WebUSB, with every
+transfer kept.
+
+1. **Build it.** From this folder, with typescript installed as above:
+
+       node node_modules/typescript/bin/tsc -p tsconfig.build.json
+
+   That writes the JavaScript into `web/`, which git ignores. The gate's
+   `types` check makes the same build in a scratch folder.
+2. **Serve it** to this computer alone. From the repository's root:
+
+       python tools/bench/serve.py
+
+3. **Open** `http://127.0.0.1:8000/bench/` in Chrome or Edge.
+   - **Connect** asks the browser for the LabPro, then sends Command 7.
+   - **Read CH1** sends Command 7 again, then the bench script's steps. It
+     resets the unit only when the unit is idle or done. Data not yet retrieved
+     is kept unless Discard is ticked.
+   - **A live reading** needs its interval and either a number of readings or a
+     number of seconds. Stop ends it between readings.
+4. **Save the record.** It downloads as JSON, only when you click Save.
+   `tools/bench/from_browser.py` writes a trace from it, as
+   [tools/bench/README.md](../tools/bench/README.md) says.
+
+One connection per page: reload the page for another, so that a record is never
+replaced unsaved.
+
 ## Limits
 
 - **The tests run on Node, not in a browser.** The WebUSB transport runs
-  against a simulated device. Both are written from the lead's knowledge of
-  the WebUSB API, not checked against its specification here.
-- **The WebUSB declarations in `webusb.ts` are this project's own.**
-  TypeScript's DOM library has none. A mistake in them would not be caught
-  before Phase 0.
+  against a simulated device. The bench page is first run in a browser at
+  Phase 0.
+  - Its steps and its record are tested on Node.
+  - Its glue to the page, `page.ts`, is not.
+- **The WebUSB declarations in `webusb.ts`, and the client-hint declarations in
+  `record.ts`, are this project's own.** TypeScript's DOM library has neither.
+  They are written from the lead's knowledge of the APIs, not checked against
+  their specifications here. A mistake in them would not be caught before
+  Phase 0.
 - **On Windows, a browser may reach a stock LabPro only with the WinUSB driver
   bound to it.** The outline names this as a risk, and Phase 0 measures it.
-- **Some constants are kept in step with the bench script by hand.**
-  `TIMEOUT_MS`, `MAX_READS` and the four framings of Command 7 match
-  `tools/bench/labpro_bench.py`'s, and no gate compares them. They are the
-  scripts' own choices, not facts about the LabPro.
+- **A school-managed Chromebook may block WebUSB.**
+- **The page's copies of the bench script's choices** are held to the script's
+  by a bench test, `tools/bench/test_browser.py`:
+  - the timeouts;
+  - the re-reads;
+  - the framings;
+  - the guard's states;
+  - the serial rule.
+
+  They are the scripts' own choices, not facts about the LabPro.
 - **A WebUSB read that times out cannot be cancelled.** It stays pending, and
-  the next read waits on it. Whether a LabPro ever answers late is for the
-  bench to show.
+  the next read waits on it.
+  - So a reply more than 2 seconds late is taken as the next command's.
+  - The bench page's guard could then act on a stale state, as
+    [tools/bench/README.md](../tools/bench/README.md) says of the bench script.
+  - Whether a LabPro ever answers late is for the bench to show.
+- **A write to the LabPro has no timeout.** A write that never ends cannot be
+  stopped from the page, since Stop acts only in a live reading. Reloading the
+  page then loses the record, unsaved.
+- **Two of the page's inputs are read late, or loosely:**
+  - Discard is read when the guard runs, after Command 7's reply, not when Read
+    CH1 is pressed.
+  - A number box holding text reads as empty, so Read CH1 then runs without a
+    live reading. The guard still applies.
+- **Each transfer's time** is when the page took it from WebUSB, not when it
+  reached the computer.
+- **No check holds the page's HTML to its code.** The ids `page.ts` looks up,
+  and the built script's path, were checked by hand on 2026-11-16.
+- **A trace's `os` line is what the browser's hints say.** On Windows 11,
+  Chromium gave "Windows 15.0.0" (MEASURED, 2026-11-16).
 - **The simulated LabPro is the lead's model, built from a fixture.** Passing
   tests show the app agrees with that model, not with a LabPro.
 - **USB pads a reply's last packet** (page 23 of the manual). The protocol
   code stops at the reply's end and does not look at what follows it. Whether
   the bridge passes that padding on is for the bridge's design to say.
+- **Two paths in `webusb.ts` no test reaches:**
+  - its second check that a configuration is active;
+  - `close()` dropping a read still pending.
+- **Edge cases in opening:**
+  - `open()` called twice, or on a device the caller had opened, closes the
+    device when it refuses.
+  - A `clearHalt` that rejects replaces the refusal's message with its own.
 
 Its licence is the one the folder table in [README.md](../README.md) gives it.

@@ -18,7 +18,9 @@ HEADER_KEYS = {
 }
 # The serial number keeps this many characters at its start and at its end, and every
 # other character becomes MASK; a serial no longer than the two together is masked whole.
-# The owner's ruling, 2026-11-16: model information only. Change the counts here alone.
+# The owner's ruling, 2026-11-16: model information only. Change the counts here. The
+# bench page keeps a copy, in app/src/bench/record.ts, for what it shows and saves; a
+# bench test holds that copy to these, and tools/bench/from_browser.py masks by these.
 SERIAL_KEPT = (3, 2)
 MASK = "*"
 SERIAL_ABSENT = ("none", "unreadable")
@@ -34,6 +36,16 @@ class TraceError(ValueError):
     def __init__(self, line, message):
         super().__init__(f"line {line}: {message}")
         self.line = line
+
+
+def device_string(text):
+    """A device's string as a trace records it: with spaces at either end removed; none
+    when there is no string or it is blank; unreadable when it holds a character that is
+    not printable."""
+    text = (text or "").strip()
+    if not text:
+        return "none"
+    return text if text.isprintable() else "unreadable"
 
 
 def mask_serial(serial):

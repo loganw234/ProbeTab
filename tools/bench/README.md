@@ -15,6 +15,12 @@ The bench script for Phase 0 with a LabPro, and its tests.
   one. It also answers requests for the device's descriptors.
 - [test_bench.py](test_bench.py) and [test_ch1.py](test_ch1.py) run the script
   against the fake. The gate's `bench` check runs them.
+- **The browser bench page's Python side:**
+  - [serve.py](serve.py) serves the page to this computer alone.
+  - [from_browser.py](from_browser.py) writes a trace from the record the page
+    saves.
+  - [test_browser.py](test_browser.py) tests both. It also holds the page's
+    copies of the script's constants to the script's own.
 - [requirements.txt](requirements.txt) pins pyusb by version and hash.
 
 Every value about the LabPro comes from `protocol/labpro-facts.toml`, and each
@@ -104,6 +110,38 @@ with its traceback. In each case the script writes the transfers it made. When
 it made none, as when it stops before the first Command 7, there is no trace
 to write.
 
+## From the browser
+
+The bench page takes the same steps in Chrome or Edge, over WebUSB.
+[app/README.md](../../app/README.md) says how to build it and use it.
+
+- **`serve.py`** serves `app/bench/` and `app/web/`, and nothing else.
+  - It binds to 127.0.0.1, so no other computer can reach it.
+  - `--port` chooses the port, 8000 by default.
+  - Each file's type comes from the script's own table, so `.js` is served as
+    JavaScript whatever the system's registry says.
+- **`from_browser.py`** writes a trace from the page's saved record:
+
+      python tools/bench/from_browser.py RECORD.json --out browser.trace
+
+  - It uses `tools/traces.py`, so the trace format keeps one writer.
+  - Each time in milliseconds becomes whole microseconds. A record whose times
+    decrease is refused.
+  - It records the device's strings by the trace format's rule, and masks the
+    serial number again, whatever the page did.
+  - It refuses a record that is not exactly what the page writes, and names what
+    is wrong.
+  - It never writes over a file, or among the fixtures.
+  - The page's refusals and findings are checked, but are not part of a trace,
+    so they are not written.
+- **A browser trace has no `device` or `configuration` line.** The page records
+  the strings WebUSB gives it, not the raw descriptors. The bench script records
+  both, when given `--descriptors`.
+- **The `os`, `stack` and `firmware` lines are the record's text,** held only to
+  the trace format's rules. A record the page did not make could carry anything
+  printable there. The gate's privacy check covers a trace once it is in the
+  repository.
+
 ## Keeping a trace as evidence
 
 The script writes wherever `--out` says, with three exceptions:
@@ -158,6 +196,13 @@ The gate then holds it to the format and to its hash.
   spells `protocol/fixtures` in other letters may get past the guard against
   writing among the fixtures (BELIEVED, not run).
 - **Collection with Command 3 and `g` waits for Phase 1.**
+- **The page's server rests on two beliefs, unchecked until Phase 0:**
+  - Chromium counts `127.0.0.1` as a secure origin, which WebUSB needs;
+  - Windows' registry can make `.js` plain text, which is why the script keeps
+    its own table.
+- **The converter's refusals of a path the system will not use** are tested
+  with stand-ins, not with real paths. One example is `::$DATA` in a folder's
+  name, which Windows refuses and other systems take as plain text.
 
 Its licence is the one the folder table in [README.md](../../README.md) gives
 it.

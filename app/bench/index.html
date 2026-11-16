@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProbeTab bench page</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+  body { margin: 0 auto; max-width: 72rem; padding: 1rem; }
+  section { margin: 1rem 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
+  input[type="number"] { width: 7rem; }
+  pre { max-height: 24rem; overflow: auto; padding: 0.5rem; border: 1px solid #8884; }
+  table { border-collapse: collapse; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+  td { padding: 0.1rem 0.6rem; border-bottom: 1px solid #8882; vertical-align: top; }
+  .warning { font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ProbeTab bench page</h1>
+  <p>Phase 0 from the browser: the bench script's steps over WebUSB. It is served from this
+    computer alone by <code>tools/bench/serve.py</code>, and needs Chrome or Edge.</p>
+
+  <section aria-label="Connection">
+    <label>Framing <select id="form"></select></label>
+    <button id="connect" type="button">Connect</button>
+    <button id="status" type="button">Command 7</button>
+    <button id="disconnect" type="button">Disconnect</button>
+  </section>
+
+  <section aria-label="Reading CH1">
+    <p class="warning">Read CH1 resets the unit (Command 0). It does so only when the unit is idle or
+      done, never when it is armed or busy. Data not yet retrieved is kept unless Discard is
+      ticked, and then that data is lost.</p>
+    <label><input id="discard" type="checkbox"> Discard data not yet retrieved</label>
+    <label>Live reading every <input id="every" type="number" min="0" max="86400" step="any"> s,</label>
+    <label>for <input id="readings" type="number" min="1" step="1"> readings</label>
+    <label>or <input id="seconds" type="number" min="0" step="any"> s</label>
+    <button id="read" type="button">Read CH1</button>
+    <button id="stop" type="button">Stop</button>
+  </section>
+
+  <section aria-label="Evidence">
+    <button id="save" type="button">Save the record</button>
+    <span>A JSON file of every transfer, for <code>tools/bench/from_browser.py</code>.
+      One connection per page; reload the page for another.</span>
+  </section>
+
+  <pre id="log" aria-live="polite"></pre>
+
+  <table>
+    <thead><tr><td>way</td><td>ms</td><td>bytes</td><td>as text</td></tr></thead>
+    <tbody id="transfers"></tbody>
+  </table>
+</main>
+<script type="module" src="../web/bench/page.js"></script>
+</body>
+</html>

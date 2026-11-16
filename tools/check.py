@@ -171,9 +171,12 @@ The checks, by name, each with what it cannot see:
                  to this check;
                - TypeScript's types are not checked, as Node strips them;
                - what the app does with the values is not checked.
-  bench      The bench script's tests pass. Each tools/bench/test_*.py is run,
-             and its tests replay fixtures through a fake pyusb backend in
-             place of a LabPro. A file passes only when it ran at least one
+  bench      The bench tools' tests pass. Each tools/bench/test_*.py is run:
+             the bench script's tests replay fixtures through a fake pyusb
+             backend in place of a LabPro, and the browser side's test the
+             converter from the bench page's records, the page's server, and
+             the page's copies of the bench script's constants and of the
+             trace format's serial rule. A file passes only when it ran at least one
              test and unittest's summary is plain OK: a skipped test, an
              expected failure or an unexpected success fails it. A file still
              running after 300 seconds fails by name. The tests run
@@ -231,10 +234,15 @@ The checks, by name, each with what it cannot see:
              check is skipped by name. No file in app/src may hold
              @ts-nocheck, @ts-ignore or @ts-expect-error, which would hide
              errors from tsc. A tsc still running after 300 seconds fails by
-             name.
-             Limits: tsc's timeout has no control of its own; and
+             name. Then app/src is built with app/tsconfig.build.json into a
+             scratch folder, as the bench page is built: the build must
+             succeed and write bench/page.js, and bench/session.js and
+             bench/record.js must load from it under node, so that the
+             imports tsc rewrote resolve.
+             Limits: tsc's timeout has no control of its own;
              app/test is not type-checked, since that needs Node's own types
-             (@types/node), which are not installed.
+             (@types/node), which are not installed; and bench/page.js is
+             built but not loaded, since it needs a browser's page.
 
 --history scans each commit in RANGE: its author and committer names and
 addresses, its message, and the lines it adds (a merge's, against its first
@@ -288,6 +296,10 @@ FAKE = "app/test/fake-labpro.ts"
 PROTOCOL_CODE = "app/src/protocol/"
 TSC = "app/node_modules/typescript/bin/tsc"
 TSCONFIG = "app/tsconfig.json"
+TSBUILD = "app/tsconfig.build.json"
+# Built modules the types check loads under node, each by an export it must have: the bench
+# page's own modules that need no browser, and through them everything they import.
+BUILT = (("bench/session.js", "RETRIES"), ("bench/record.js", "RECORD_FORMAT"))
 TS_DIRECTIVES = ("@ts-nocheck", "@ts-ignore", "@ts-expect-error")  # each hides errors from tsc
 IMPORT = re.compile(r"""\bfrom\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)|^\s*import\s*["']([^"']+)["']""",
                     re.M)
@@ -1095,8 +1107,49 @@ def check_types(root, files, ctx):
         for error in errors or [collapse(output)[-300:] or f"tsc exited with status {run.returncode}"]:
             report.fail(error)
         return report
-    report.note(f"app/src type-checked by TypeScript {installed}, the version app/package.json pins")
+    built = build_the_page(root, files, ctx, node, tsc, report)
+    if built is None:
+        return report
+    report.note(f"app/src type-checked by TypeScript {installed}, the version app/package.json pins, and built: "
+                f"{built} modules, of which {' and '.join(name for name, _ in BUILT)} load under node")
     return report
+
+
+def build_the_page(root, files, ctx, node, tsc, report):
+    """Builds app/src with TSBUILD into a scratch folder, as the bench page is built, and loads the
+    BUILT modules from it under node. The number of modules built, or None after a failure."""
+    if TSBUILD not in files:
+        report.fail(f"{TSBUILD} is missing, so the bench page cannot be built")
+        return None
+    with tempfile.TemporaryDirectory(prefix="probetab-build-") as scratch:
+        out = Path(scratch)
+        try:
+            run = subprocess.run([node, str(tsc), "-p", str(root / TSBUILD), "--outDir", str(out)], cwd=root,
+                                 capture_output=True, timeout=ctx.test_timeout)
+        except subprocess.TimeoutExpired:
+            report.fail(f"the build did not finish within {ctx.test_timeout} s")
+            return None
+        output = masked((run.stdout + run.stderr).decode("utf-8", errors="replace").replace("\r\n", "\n"),
+                        ((str(root), "<repo>"), (tempfile.gettempdir(), "<temp>")))
+        if run.returncode != 0:
+            errors = [line.strip() for line in output.split("\n") if re.search(r"error TS\d+", line)]
+            for error in errors or [collapse(output)[-300:] or f"tsc exited with status {run.returncode}"]:
+                report.fail(f"the build: {error}")
+            return None
+        if not (out / "bench" / "page.js").is_file():
+            report.fail(f"the build wrote no bench/page.js, so the bench page would load nothing; {TSBUILD} "
+                        f"must emit")
+            return None
+        # The build's own folder has no package.json, so node is told its modules are ES modules, as
+        # app/package.json tells it for app/web/.
+        (out / "package.json").write_bytes(b'{"type": "module"}\n')
+        for name, export in BUILT:
+            _, problem = node_export(node, out / name, export)
+            if problem:
+                report.fail(f"the build's {name} does not load under node: "
+                            f"{masked(problem, ((str(out), '<build>'), (tempfile.gettempdir(), '<temp>')))}")
+                return None
+        return sum(1 for _ in out.rglob("*.js"))
 
 
 def check_history(revisions, ctx, repo=ROOT):
@@ -1740,6 +1793,51 @@ def plant_bench_resetting_an_initializing_unit(root, files, ctx):
     return files
 
 
+def plant_bench_page_resetting_a_busy_unit(root, files, ctx):
+    edit(root, "app/src/bench/session.ts", r'\["status\.state_idle", "status\.state_done"\]',
+         '["status.state_idle", "status.state_done", "status.state_busy"]', within="export const RESETTABLE")
+    return files
+
+
+def plant_converter_taking_decreasing_times(root, files, ctx):
+    edit(root, BENCH + "from_browser.py", r"if ms < last:", "if False:", within="def convert")
+    return files
+
+
+def plant_converter_taking_any_bytes(root, files, ctx):
+    edit(root, BENCH + "from_browser.py", r"if not isinstance\(data, str\) or not HEX\.fullmatch\(data\):",
+         "if not isinstance(data, str):", within="def convert")
+    return files
+
+
+def plant_server_bound_everywhere(root, files, ctx):
+    """Only the test that takes the address without binding it sees this; the others name 127.0.0.1."""
+    edit(root, BENCH + "serve.py", r'ADDRESS = "127\.0\.0\.1"', 'ADDRESS = "0.0.0.0"', within="ADDRESS")
+    return files
+
+
+def plant_server_serving_js_as_text(root, files, ctx):
+    edit(root, BENCH + "serve.py", r'"\.js": "text/javascript; charset=utf-8"', '".js": "text/plain; charset=utf-8"',
+         within="TYPES")
+    return files
+
+
+def plant_page_mask_out_of_step(root, files, ctx):
+    edit(root, "app/src/bench/record.ts", r"SERIAL_KEPT = \[3, 2\]", "SERIAL_KEPT = [4, 2]",
+         within="export const SERIAL_KEPT")
+    return files
+
+
+def plant_build_failing(root, files, ctx):
+    edit(root, TSBUILD, r'\s*"rewriteRelativeImportExtensions": true,', "", within="compilerOptions")
+    return files
+
+
+def plant_build_writing_nothing(root, files, ctx):
+    edit(root, TSBUILD, r'"noEmit": false', '"noEmit": true', within="compilerOptions")
+    return files
+
+
 def plant_bench_every_unbounded(root, files, ctx):
     edit(root, BENCH + "labpro_bench.py", r"if value > MAX_EVERY:", "if False:", within="def interval")
     return files
@@ -1964,6 +2062,20 @@ CONTROLS = [
      "test_every_is_bounded_and_for_is_not"),
     ("bench", "the bench script losing the trace to an error it does not name",
      plant_bench_losing_the_trace_to_an_error, "test_an_unnamed_error_keeps_the_trace_and_goes_on"),
+    ("bench", "the converter taking times that decrease", plant_converter_taking_decreasing_times,
+     "test_times_that_decrease_are_refused"),
+    ("bench", "the converter taking bytes that are not a trace's hex", plant_converter_taking_any_bytes,
+     "test_malformed_records_are_refused"),
+    ("bench", "the page's server bound to every address", plant_server_bound_everywhere,
+     "test_it_binds_to_this_computer_alone"),
+    ("bench", "the page's server serving .js as text", plant_server_serving_js_as_text,
+     "test_the_page_and_its_modules_are_served_with_their_types"),
+    ("bench", "the page's serial mask out of step with the trace rule", plant_page_mask_out_of_step,
+     "test_the_page_masks_the_serial_by_the_trace_rule"),
+    ("app", "the bench page resetting a busy unit", plant_bench_page_resetting_a_busy_unit,
+     "an armed or busy unit is never reset, discard or not:"),
+    ("types", "the bench page's build failing", plant_build_failing, "error TS5096"),
+    ("types", "the bench page's build writing nothing", plant_build_writing_nothing, "the build wrote no bench/page.js"),
     ("app", "an enum in the app", plant_app_enum, "ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX"),
     ("app", "an import without its .ts", plant_import_without_extension, "ERR_MODULE_NOT_FOUND"),
     ("app", "a failing app test", plant_failing_app_test, "a write reaches the device's end as one piece, copied:"),

@@ -5,9 +5,11 @@ sensor interface back into everyday use. It is one web app that collects data
 over the LabPro's own USB port, or through a small ESP32-S3 bridge over USB,
 Wi-Fi or Bluetooth, with nothing to install and no account.
 
-**Status, 2026-11-15: set-up only.** Nothing runs yet, and no LabPro has been
-connected to anything in this repository. Every fact about the LabPro here is
-read from Vernier's manual and marked unverified until a LabPro confirms it.
+**Status, 2026-11-16: ready for Phase 0, the first contact with a LabPro.** A
+bench script and a browser bench page are written, and tested against
+simulated LabPros only. No LabPro has been connected to anything in this
+repository yet. Every fact about the LabPro here is read from Vernier's manual,
+and marked unverified until a LabPro confirms it.
 
 ## The authority
 
@@ -21,9 +23,9 @@ Everything else is a claim to be held against them:
   - its page;
   - the words on that page that state it;
   - the status `manual`, until a recorded trace confirms it.
-- **A simulated LabPro**, when there is one, is written from the same manual.
-  Tests that pass against it show that the code agrees with our reading of the
-  manual, not with the device.
+- **The simulated LabPros**, in the app's tests and in the bench script's, are
+  written from the same manual. Tests that pass against them show that the code
+  agrees with our reading of the manual, not with the device.
 
 ## What's here
 
@@ -35,7 +37,7 @@ Everything else is a claim to be held against them:
 | `hardware/` | Bridge schematics, board files and enclosure | CERN-OHL-P-2.0 |
 | `protocol/` | LabPro facts, the protocol reference and recorded traces | CC-BY-4.0 |
 | `sensors/` | Sensor identification and calibration data | CC-BY-4.0 |
-| `tools/` | The gate, the generator, the trace format, and the bench script | MIT |
+| `tools/` | The gate, the generator, the trace format, and the bench tools | MIT |
 | `docs/` | Guides for teachers and builders | CC-BY-4.0 |
 <!-- folders:end -->
 
