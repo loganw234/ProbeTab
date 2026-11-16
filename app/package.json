@@ -1,0 +1,10 @@
+{
+  "name": "probetab-app",
+  "private": true,
+  "type": "module",
+  "description": "The ProbeTab browser app. Its tests run on a Node that strips types itself, as Node 22.19 does; typescript is needed only for the gate's types check.",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}

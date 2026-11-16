@@ -17,7 +17,8 @@ The files checked are the working-tree copies of the files git would commit:
 the tracked files, plus the untracked files .gitignore does not exclude. The
 staged check says when a staged copy differs from the copy that was read.
 Programs are started by the full path shutil.which finds, never by a bare name;
-the bench check's Python is found by its path, as that check says.
+the bench check's Python and the types check's tsc are found by their paths, as
+those checks say.
 
 The checks, by name, each with what it cannot see:
 
@@ -148,11 +149,14 @@ The checks, by name, each with what it cannot see:
              Limit: a fixture copied into protocol/traces/ with a recording's
              header passes. Which traces were recorded is the lead's ledger's
              record, not the gate's.
-  generated  app/src/generated/labpro-facts.ts is exactly what
-             tools/generate.py makes of protocol/labpro-facts.toml. Node loads
-             it and must find every fact's value, unit, channels, source, page
-             and status equal to the TOML's, type included: a boolean equals
-             only a boolean, and a string only a string.
+  generated  app/src/generated/labpro-facts.ts and app/test/generated/fixtures.ts
+             are exactly what tools/generate.py makes of
+             protocol/labpro-facts.toml and of the fixtures in
+             protocol/fixtures/. Node loads both. It must find every fact's
+             value, unit, channels, source, page and status equal to the
+             TOML's, and every fixture's model and transfers equal to what
+             tools/traces.py reads, type included: a boolean equals only a
+             boolean, and a string only a string.
              With no node on PATH, that round trip is skipped by name. A Node
              that cannot load .ts files fails it, naming its version.
              Limits:
@@ -165,14 +169,15 @@ The checks, by name, each with what it cannot see:
              and its tests replay fixtures through a fake pyusb backend in
              place of a LabPro. A file passes only when it ran at least one
              test and unittest's summary is plain OK: a skipped test, an
-             expected failure or an unexpected success fails it. The tests run
+             expected failure or an unexpected success fails it. A file still
+             running after 300 seconds fails by name. The tests run
              under a Python that has pyusb: the one running this script if it
              has it, otherwise the repository's .venv, found by its path. With
              neither, the check is skipped by name. In what it reports, the
              paths of the repository and the temp folder are shown as <repo>
-             and <temp>, where written plainly or with the doubled backslashes
-             of a Python repr; other forms, and other paths, are not
-             rewritten.
+             and <temp>, where written plainly, with the doubled backslashes
+             of a Python repr, or with forward slashes as in a file URL;
+             other forms, and other paths, are not rewritten.
              Limits:
                - the fake is the lead's model of a LabPro, built from the facts
                  and a fixture, so passing tests say the script agrees with
@@ -181,6 +186,39 @@ The checks, by name, each with what it cannot see:
                  are not run;
                - what the tests assert is not read here, only whether they
                  pass; --control plants faults they must catch.
+  app        The app's tests pass, and its simulated LabPro stays apart from
+             its protocol code:
+               - each app/test/*.test.ts runs alone, in a node process of its
+                 own, under the TAP reporter. A file passes only when node
+                 exits 0 and prints its summary, with at least one test, and
+                 every test passed. A failure, a skip, a todo or a cancellation
+                 fails it. So does a missing summary, which is what a file
+                 gives that holds no tests or exits early. A file still running
+                 after 300 seconds fails by name.
+               - app/test/fake-labpro.ts reaches nothing under
+                 app/src/protocol/. Its imports are followed through the
+                 repository by their relative specifiers, percent-decoded and
+                 compared without regard to case.
+             With no node on PATH, the tests are skipped by name. Paths are
+             shown as the bench check shows them.
+             Limits:
+               - the tests run on Node, not in a browser, and the WebUSB
+                 transport runs against a simulated device;
+               - an import whose path is built at run time, such as from a
+                 template literal, or one reached through createRequire or
+                 import.meta.resolve, is not followed;
+               - the tests themselves are not type-checked (see types).
+  types      app/src type-checks under tsc --noEmit with app/tsconfig.json,
+             which allows erasable syntax only, so an enum, a namespace with
+             code or a parameter property fails it, as it would fail Node. The
+             tsc is the repository's app/node_modules one, found by its path,
+             and it must be the version app/package.json pins. Without it, the
+             check is skipped by name. No file in app/src may hold
+             @ts-nocheck, @ts-ignore or @ts-expect-error, which would hide
+             errors from tsc. A tsc still running after 300 seconds fails by
+             name.
+             Limit: app/test is not type-checked; that needs Node's own types
+             (@types/node), which are not installed.
 
 --history scans each commit in RANGE: its author and committer names and
 addresses, its message, and the lines it adds (a merge's, against its first
@@ -210,6 +248,7 @@ import tempfile
 import tomllib
 import unicodedata
 from pathlib import Path
+from urllib.parse import unquote
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import generate  # noqa: E402
@@ -228,6 +267,14 @@ RUN = 8  # a run of this many words in a row shared with the manual counts as co
 WORD = re.compile(r"[a-z0-9]+")
 DROPPED = {"Mn", "Me", "Cf"}  # marks and invisible format characters, removed before words are compared
 BENCH = "tools/bench/"
+APP_TESTS = "app/test/"
+FAKE = "app/test/fake-labpro.ts"
+PROTOCOL_CODE = "app/src/protocol/"
+TSC = "app/node_modules/typescript/bin/tsc"
+TSCONFIG = "app/tsconfig.json"
+TS_DIRECTIVES = ("@ts-nocheck", "@ts-ignore", "@ts-expect-error")  # each hides errors from tsc
+IMPORT = re.compile(r"""\bfrom\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)|^\s*import\s*["']([^"']+)["']""",
+                    re.M)
 EVIDENCE_LINE = re.compile(r"""^evidence = (?:"[^"\n]*"|'[^'\n]*')[ \t]*$""", re.M)
 LICENCE_FILES = {
     "MIT": "LICENSE",
@@ -295,8 +342,10 @@ class Context:
         self.pages = {}
         self.runs = {}
         self.render = generate.render  # a control may put a mutant here
+        self.render_fixtures = generate.render_fixtures  # and here
         self.files = []                # the real file set, for controls that build copies
         self.pythons = None            # where the bench check looks for pyusb; a control may narrow it
+        self.test_timeout = 300        # seconds a test file, or tsc, may run; a control shortens it
 
 
 def tool(name):
@@ -823,40 +872,214 @@ def same_fact(got, want):
             and all(same_value(got[key], want[key]) for key in want))
 
 
+def same_json(got, want):
+    """Equal as same_value has it, all the way down through objects and arrays."""
+    if isinstance(want, dict):
+        return isinstance(got, dict) and got.keys() == want.keys() and all(same_json(got[k], want[k]) for k in want)
+    if isinstance(want, list):
+        return isinstance(got, list) and len(got) == len(want) and all(map(same_json, got, want))
+    return same_value(got, want)
+
+
+def node_export(node, path, export):
+    """(the export's value, None), loaded from the module at path through Node, or (None, why not)."""
+    script = (f"import(process.argv[1]).then(m => process.stdout.write(JSON.stringify(m[{json.dumps(export)}] ?? null)),"
+              " e => { process.stderr.write(String(e)); process.exit(1); })")
+    loaded = subprocess.run([node, "-e", script, path.resolve().as_uri()], capture_output=True)
+    if loaded.returncode != 0:
+        return None, loaded.stderr.decode("utf-8", errors="replace").strip()[:300]
+    value = json.loads(loaded.stdout.decode("utf-8"))
+    return (value, None) if value is not None else (None, f"it has no export {export}")
+
+
 def check_generated(root, files, ctx):
     report = Report("generated")
-    output = generate.OUTPUT
+    output, fixtures_output = generate.OUTPUT, generate.FIXTURES_OUTPUT
     try:
         data = labpro_facts.load(root)
         expected = ctx.render(data)
+        found = generate.fixtures(root)
+        expected_fixtures = ctx.render_fixtures(found)
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError, generate.Refused) as exc:
         report.fail(f"the generator cannot run: {exc}")
         return report
-    if output not in files:
-        report.fail(f"{output} is missing; run python tools/generate.py")
+    for name, text, source in ((output, expected, FACTS), (fixtures_output, expected_fixtures, generate.FIXTURES)):
+        if name not in files:
+            report.fail(f"{name} is missing; run python tools/generate.py")
+        elif (root / name).read_bytes() != text.encode("utf-8"):
+            report.fail(f"{name} differs from what tools/generate.py makes of {source}; run python tools/generate.py")
+    if any(name not in files for name in (output, fixtures_output)):
         return report
-    if (root / output).read_bytes() != expected.encode("utf-8"):
-        report.fail(f"{output} differs from what tools/generate.py makes of {FACTS}; run python tools/generate.py")
     node = tool("node")
     if not node:
         report.skip("the round trip through Node is not checked: node is not on PATH")
         return report
     version = subprocess.run([node, "--version"], capture_output=True).stdout.decode("ascii", errors="replace").strip()
-    script = ("import(process.argv[1]).then(m => process.stdout.write(JSON.stringify(m.LABPRO_FACTS)),"
-              " e => { process.stderr.write(String(e)); process.exit(1); })")
-    loaded = subprocess.run([node, "-e", script, (root / output).resolve().as_uri()], capture_output=True)
-    if loaded.returncode != 0:
+    got, problem = node_export(node, root / output, "LABPRO_FACTS")
+    if problem:
         report.fail(f"node {version} could not load {output}; the round trip needs a Node that loads .ts "
-                    f"files by stripping types: {loaded.stderr.decode('utf-8', errors='replace').strip()[:300]}")
+                    f"files by stripping types: {problem}")
         return report
-    got = json.loads(loaded.stdout.decode("utf-8"))
     want = {name: {field: fact.get(field) for field in generate.FIELDS}
             for name, fact in labpro_facts.facts(data)}
     for name in sorted(set(got) | set(want)):
         if not same_fact(got.get(name), want.get(name)):
             report.fail(f"round trip: {name} loads from {output} as {got.get(name)!r}, "
                         f"but {FACTS} has {want.get(name)!r}")
-    report.note(f"{len(want)} facts loaded back through node {version} ({node})")
+    got_fixtures, problem = node_export(node, root / fixtures_output, "FIXTURES")
+    if problem:
+        report.fail(f"node {version} could not load {fixtures_output}: {problem}")
+        return report
+    want_fixtures = {name: {"model": trace.header["model"],
+                            "transfers": [{"direction": direction, "micros": micros, "bytes": data.hex(" ")}
+                                          for direction, micros, data in trace.transfers]}
+                     for name, trace in found}
+    for name in sorted(set(got_fixtures) | set(want_fixtures)):
+        if not same_json(got_fixtures.get(name), want_fixtures.get(name)):
+            report.fail(f"round trip: {name} loads from {fixtures_output} unlike {generate.FIXTURES}{name}")
+    fixtures_counted = f"{len(want_fixtures)} fixture{'' if len(want_fixtures) == 1 else 's'}"
+    report.note(f"{len(want)} facts and {fixtures_counted} loaded back through node {version} ({node})")
+    return report
+
+
+def reached(root, start):
+    """{file: the chain of imports from start to it}, for each repository file that start
+    imports, directly or through other files, by a relative specifier."""
+    chains, queue = {start: [start]}, [start]
+    while queue:
+        name = queue.pop(0)
+        path = root / name
+        if not path.is_file():
+            continue
+        for match in IMPORT.finditer(path.read_bytes().decode("utf-8", errors="replace")):
+            specifier = next(group for group in match.groups() if group)
+            if not specifier.startswith("."):
+                continue
+            # Node resolves a percent-encoded path, and Windows a path in any case, so both are read as the file.
+            target = posixpath.normpath(posixpath.join(posixpath.dirname(name), unquote(specifier)))
+            if target not in chains:
+                chains[target] = chains[name] + [target]
+                queue.append(target)
+    return chains
+
+
+def tap_problems(output):
+    """One line for each failing test in node's TAP report: its name, then what it raised."""
+    problems, lines = [], output.split("\n")
+    for index, line in enumerate(lines):
+        match = re.match(r"^\s*not ok \d+ - (.*)$", line)
+        if not match:
+            continue
+        details = []
+        for detail in lines[index + 1:]:
+            stripped = detail.strip()
+            if re.match(r"^(ok|not ok) \d+ ", stripped) or stripped == "..." or stripped.startswith("stack:"):
+                break
+            if stripped and not stripped.startswith(("---", "duration_ms:", "type:", "location:")):
+                details.append(stripped)
+        problems.append(f"{match.group(1)}: {collapse(' '.join(details))[:600]}")
+    return problems
+
+
+def check_app(root, files, ctx):
+    report = Report("app")
+    tests = [name for name in files if name.startswith(APP_TESTS) and name.endswith(".test.ts")]
+    if not tests:
+        report.fail(f"{APP_TESTS} holds no *.test.ts, so nothing tests the app")
+        return report
+    if FAKE not in files:
+        report.fail(f"{FAKE} is missing")
+    else:
+        for target, chain in sorted(reached(root, FAKE).items()):
+            if target.casefold().startswith(PROTOCOL_CODE.casefold()):
+                report.fail(f"{' -> '.join(chain)}: the fake shares no code with the protocol code")
+    node = tool("node")
+    if not node:
+        report.skip("the app's tests are not run: node is not on PATH")
+        return report
+    version = subprocess.run([node, "--version"], capture_output=True).stdout.decode("ascii", errors="replace").strip()
+    passed = 0
+    for name in tests:
+        # Each file runs alone, in one process: node prints its TAP summary only when the file's
+        # tests ran to their end, so a file that holds none, or exits early, prints none.
+        try:
+            run = subprocess.run([node, "--test-reporter=tap", name], cwd=root, capture_output=True,
+                                 timeout=ctx.test_timeout)
+        except subprocess.TimeoutExpired:
+            report.fail(f"{name}: did not finish within {ctx.test_timeout} s, so it counts as failed")
+            continue
+        output = (run.stdout + run.stderr).decode("utf-8", errors="replace").replace("\r\n", "\n")
+        output = masked(output, ((str(root), "<repo>"), (tempfile.gettempdir(), "<temp>")))
+        counts = {key: int(value) for key, value in re.findall(
+            r"^# (tests|pass|fail|cancelled|skipped|todo) (\d+)$", output, re.M)}
+        unpassed = {key: counts[key] for key in ("fail", "cancelled", "skipped", "todo") if counts.get(key)}
+        if run.returncode == 0 and counts.get("tests", 0) > 0 and counts.get("pass") == counts["tests"] \
+                and not unpassed:
+            passed += counts["pass"]
+            continue
+        problems = tap_problems(output)
+        if "tests" not in counts:
+            problems.append("node printed no TAP summary, so the file held no tests or ended before they did")
+        if unpassed:
+            problems.append("node reports " + ", ".join(f"{number} {key}" for key, number in unpassed.items())
+                            + "; only a test that passes counts")
+        # A file that fails to load prints its cause, not a TAP result.
+        causes = [line.removeprefix("# ").strip() for line in output.split("\n")
+                  if re.match(r"^(?:# )?(?:\w*Error\b|\s*code: '[A-Z_]+')", line)]
+        if causes:
+            problems.append(f"node's diagnostics: {collapse(' | '.join(causes))[:600]}")
+        for problem in problems or [collapse(output)[-300:] or f"node exited with status {run.returncode}"]:
+            report.fail(f"{name}: {problem}")
+    report.note(f"{passed} tests passed under node {version} ({node}), each file run alone"
+                if not report.fails else f"run under node {version} ({node})")
+    return report
+
+
+def check_types(root, files, ctx):
+    report = Report("types")
+    if TSCONFIG not in files:
+        report.fail(f"{TSCONFIG} is missing")
+        return report
+    for name in files:
+        if name.startswith("app/src/") and name.endswith(".ts"):
+            text = (root / name).read_bytes().decode("utf-8", errors="replace")
+            for directive in TS_DIRECTIVES:
+                if directive in text:
+                    report.fail(f"{name}: holds {directive}, which would hide errors from this check")
+    tsc = ctx.reference_root / TSC
+    if not tsc.is_file():
+        report.skip("app/src is not type-checked: typescript is not installed in app/node_modules; "
+                    "app/README.md says how to install it")
+        return report
+    node = tool("node")
+    if not node:
+        report.skip("app/src is not type-checked: node is not on PATH")
+        return report
+    try:
+        pinned = json.loads((root / "app/package.json").read_bytes())["devDependencies"]["typescript"]
+    except (OSError, ValueError, KeyError, TypeError):
+        report.fail("app/package.json pins no typescript version")
+        return report
+    installed = subprocess.run([node, str(tsc), "--version"], capture_output=True).stdout.decode(
+        "ascii", errors="replace").strip().removeprefix("Version ")
+    if installed != pinned:
+        report.fail(f"app/node_modules has TypeScript {installed}, but app/package.json pins {pinned}; "
+                    f"run npm ci in app/")
+        return report
+    try:
+        run = subprocess.run([node, str(tsc), "--noEmit", "-p", str(root / TSCONFIG)], cwd=root, capture_output=True,
+                             timeout=ctx.test_timeout)
+    except subprocess.TimeoutExpired:
+        report.fail(f"tsc did not finish within {ctx.test_timeout} s")
+        return report
+    output = masked((run.stdout + run.stderr).decode("utf-8", errors="replace").replace("\r\n", "\n"),
+                    ((str(root), "<repo>"), (tempfile.gettempdir(), "<temp>")))
+    if run.returncode != 0:
+        errors = [line.strip() for line in output.split("\n") if re.search(r"error TS\d+", line)]
+        for error in errors or [collapse(output)[-300:] or f"tsc exited with status {run.returncode}"]:
+            report.fail(error)
+        return report
+    report.note(f"app/src type-checked by TypeScript {installed}, the version app/package.json pins")
     return report
 
 
@@ -944,12 +1167,13 @@ def test_problems(output):
 
 
 def masked(text, paths):
-    """text with each (path, name) in paths shown as name, where the path is written plainly or with
-    the doubled backslashes a Python repr gives it on Windows."""
+    """text with each (path, name) in paths shown as name, where the path is written plainly, with
+    the doubled backslashes a Python repr gives it on Windows, or with forward slashes, as in a
+    file URL."""
     for path, name in paths:
         text = text.replace(path, name)
         if "\\" in path:
-            text = text.replace(path.replace("\\", "\\\\"), name)
+            text = text.replace(path.replace("\\", "\\\\"), name).replace(path.replace("\\", "/"), name)
     return text
 
 
@@ -967,7 +1191,12 @@ def check_bench(root, files, ctx):
     passed = 0
     temp = tempfile.gettempdir()
     for name in tests:
-        run = subprocess.run([str(python), "-I", "-B", str(root / name)], cwd=root, capture_output=True, timeout=300)
+        try:
+            run = subprocess.run([str(python), "-I", "-B", str(root / name)], cwd=root, capture_output=True,
+                                 timeout=ctx.test_timeout)
+        except subprocess.TimeoutExpired:
+            report.fail(f"{name}: did not finish within {ctx.test_timeout} s, so it counts as failed")
+            continue
         # On Windows, Python writes CRLF to a piped stderr; the report is read line by line. Paths under
         # the repository and the temp folder can name the user, so they are shown as <repo> and <temp>.
         output = run.stderr.decode("utf-8", errors="replace").replace("\r\n", "\n")
@@ -1003,6 +1232,8 @@ CHECKS = {
     "traces": check_traces,
     "generated": check_generated,
     "bench": check_bench,
+    "app": check_app,
+    "types": check_types,
 }
 
 
@@ -1462,6 +1693,84 @@ def plant_bench_tests_left_out(root, files, ctx):
     return [name for name in files if not (name.startswith(BENCH) and posixpath.basename(name).startswith("test_"))]
 
 
+def plant_app_enum(root, files, ctx):
+    append(root, "app/src/transport/transport.ts", "\nexport enum Planted { One }\n")
+    return files
+
+
+def plant_parameter_property(root, files, ctx):
+    append(root, "app/src/transport/transport.ts",
+           "\nexport class Planted {\n  constructor(private readonly planted: number) {}\n}\n")
+    return files
+
+
+def plant_import_without_extension(root, files, ctx):
+    edit(root, "app/src/transport/memory.ts", r'from "\./transport\.ts"', 'from "./transport"', within="import")
+    return files
+
+
+def plant_failing_app_test(root, files, ctx):
+    edit(root, APP_TESTS + "memory.test.ts", r"assert\.equal\(await link\.write\(data\), 3\);",
+         "assert.equal(await link.write(data), 4);", within="a write reaches")
+    return files
+
+
+def plant_skipped_app_test(root, files, ctx):
+    edit(root, APP_TESTS + "memory.test.ts", r'test\("a read with nothing to read times out"',
+         'test.skip("a read with nothing to read times out"', within='test("a read with nothing')
+    return files
+
+
+def plant_fake_importing_protocol(root, files, ctx):
+    append(root, FAKE, '\nimport "../src/protocol/status.ts";\n')
+    return files
+
+
+def plant_fake_reaching_protocol_indirectly(root, files, ctx):
+    append(root, "app/src/transport/memory.ts", '\nexport { cite } from "../protocol/facts.ts";\n')
+    return files
+
+
+def plant_app_test_file_emptied(root, files, ctx):
+    (root / APP_TESTS / "webusb.test.ts").write_bytes(b"")
+    return files
+
+
+def plant_app_test_exiting_early(root, files, ctx):
+    edit(root, APP_TESTS + "status.test.ts", r"const TIMEOUT_MS = 100;", "const TIMEOUT_MS = 100;\nprocess.exit(0);",
+         within="const TIMEOUT_MS")
+    return files
+
+
+def plant_fake_importing_protocol_in_another_case(root, files, ctx):
+    append(root, FAKE, '\nimport "../SRC/Protocol/status.ts";\n')
+    return files
+
+
+def plant_fake_importing_protocol_percent_encoded(root, files, ctx):
+    append(root, FAKE, '\nimport "../src/%70rotocol/status.ts";\n')
+    return files
+
+
+def plant_ts_nocheck(root, files, ctx):
+    append(root, "app/src/protocol/facts.ts", "\n// @ts-nocheck\n")
+    return files
+
+
+def plant_app_tests_left_out(root, files, ctx):
+    return [name for name in files if not (name.startswith(APP_TESTS) and name.endswith(".test.ts"))]
+
+
+def plant_type_error(root, files, ctx):
+    append(root, "app/src/protocol/facts.ts", '\nexport const planted: number = "not a number";\n')
+    return files
+
+
+def plant_hand_edited_fixtures(root, files, ctx):
+    edit(root, generate.FIXTURES_OUTPUT, r'bytes: "73 7b 37 7d 0d"', 'bytes: "73 7b 38 7d 0d"', within="export const")
+    return files
+
+
 def plant_unsafe_integer(root, files, ctx):
     edit(root, FACTS, r"value = 0x08F7", "value = 9007199254740993", within=FACT)
     return files
@@ -1553,6 +1862,29 @@ CONTROLS = [
     ("bench", "the bench tests skipped", plant_bench_tests_skipped, "unittest reports OK (skipped="),
     ("bench", "a failure that shows a scratch path", plant_bench_failure_showing_a_path,
      "'zzplanted' not found in 'refused: <temp>"),
+    ("app", "an enum in the app", plant_app_enum, "ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX"),
+    ("app", "an import without its .ts", plant_import_without_extension, "ERR_MODULE_NOT_FOUND"),
+    ("app", "a failing app test", plant_failing_app_test, "a write reaches the device's end as one piece, copied:"),
+    ("app", "a skipped app test", plant_skipped_app_test, "node reports 1 skipped"),
+    ("app", "the fake importing the protocol code", plant_fake_importing_protocol,
+     "app/test/fake-labpro.ts -> app/src/protocol/status.ts: the fake shares no code"),
+    ("app", "the fake reaching the protocol code through another file", plant_fake_reaching_protocol_indirectly,
+     "app/test/fake-labpro.ts -> app/src/transport/memory.ts -> app/src/protocol/facts.ts: the fake shares no code"),
+    ("app", "the app tests left out", plant_app_tests_left_out, "holds no *.test.ts"),
+    ("app", "an app test file emptied", plant_app_test_file_emptied,
+     "app/test/webusb.test.ts: node printed no TAP summary"),
+    ("app", "an app test file that exits early", plant_app_test_exiting_early,
+     "app/test/status.test.ts: node printed no TAP summary"),
+    ("app", "the fake importing the protocol code in another case", plant_fake_importing_protocol_in_another_case,
+     "app/test/fake-labpro.ts -> app/SRC/Protocol/status.ts: the fake shares no code"),
+    ("app", "the fake importing the protocol code percent-encoded", plant_fake_importing_protocol_percent_encoded,
+     "app/test/fake-labpro.ts -> app/src/protocol/status.ts: the fake shares no code"),
+    ("types", "a @ts-nocheck in the app", plant_ts_nocheck, "holds @ts-nocheck"),
+    ("types", "a type error in the app", plant_type_error, "error TS2322"),
+    ("types", "an enum in the app", plant_app_enum, "error TS1294"),
+    ("types", "a parameter property in the app", plant_parameter_property, "error TS1294"),
+    ("generated", "a hand-edited fixtures file", plant_hand_edited_fixtures,
+     "app/test/generated/fixtures.ts differs from what tools/generate.py makes of protocol/fixtures/"),
 ]
 
 
@@ -1665,6 +1997,48 @@ def build_run_of_seven(base, ctx):
     return check_reference(root, walked_files(root), ctx)
 
 
+def build_fixtures_mutant(base, ctx):
+    """A generator that writes one fixture byte wrong, consistently: the file matches the generator,
+    so only the round trip through Node can see it."""
+    root = copy_files(ctx.files, base / "fixtures-mutant")
+    good = generate.render_fixtures(generate.fixtures(root))
+    bad = good.replace('bytes: "73 7b 37 7d 0d"', 'bytes: "73 7b 38 7d 0d"', 1)
+    if bad == good:
+        raise RuntimeError("control cannot be planted: no Command 7 in the generated fixtures")
+    (root / generate.FIXTURES_OUTPUT).write_bytes(bad.encode("utf-8"))
+    mutant = Context(ctx.reference_root, ctx.git_root)
+    mutant.render_fixtures = lambda found: bad
+    return check_generated(root, walked_files(root), mutant)
+
+
+def build_hanging_app_test(base, ctx):
+    """An app test that never settles in time: the check must fail it by name, and go on."""
+    root = copy_files(ctx.files, base / "hanging-app-test")
+    append(root, APP_TESTS + "memory.test.ts",
+           '\ntest("planted: hangs", async () => {\n  await new Promise((resolve) => setTimeout(resolve, 60000));\n});\n')
+    hurried = Context(ctx.reference_root, ctx.git_root)
+    hurried.test_timeout = 3
+    return check_app(root, walked_files(root), hurried)
+
+
+def build_hanging_bench_test(base, ctx):
+    """A bench test that never ends in time: the check must fail it by name, and go on."""
+    root = copy_files(ctx.files, base / "hanging-bench-test")
+    edit(root, BENCH + "test_bench.py", r'if __name__ == "__main__":',
+         'class Planted(unittest.TestCase):\n    def test_hangs(self):\n        import time\n        time.sleep(60)\n\n\n'
+         'if __name__ == "__main__":', within='if __name__')
+    hurried = Context(ctx.reference_root, ctx.git_root)
+    hurried.test_timeout = 3
+    return check_bench(root, walked_files(root), hurried)
+
+
+def build_types_without_typescript(base, ctx):
+    """No typescript installed: the types check must be skipped by name, not passed."""
+    root = copy_files(ctx.files, base / "types-without-typescript")
+    bare = Context(base / "nowhere", ctx.git_root)
+    return check_types(root, walked_files(root), bare)
+
+
 def build_bench_without_pyusb(base, ctx):
     """No Python with pyusb to be found: the bench check must be skipped by name, not passed."""
     root = copy_files(ctx.files, base / "bench-without-pyusb")
@@ -1707,6 +2081,13 @@ BUILT_CONTROLS = [
      "no commits in HEAD..HEAD"),
     ("bench", "no Python with pyusb", build_bench_without_pyusb, "skip",
      "the bench script's tests are not run"),
+    ("generated", "a generator that writes a fixture byte wrong, consistently", build_fixtures_mutant, "fail",
+     "round trip: status-request.trace loads from app/test/generated/fixtures.ts unlike"),
+    ("types", "no typescript installed", build_types_without_typescript, "skip", "app/src is not type-checked"),
+    ("app", "an app test that hangs", build_hanging_app_test, "fail",
+     "app/test/memory.test.ts: did not finish within 3 s"),
+    ("bench", "a bench test that hangs", build_hanging_bench_test, "fail",
+     "tools/bench/test_bench.py: did not finish within 3 s"),
 ]
 
 

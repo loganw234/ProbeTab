@@ -18,8 +18,10 @@ Before a commit, run it with `--require-all`. Its `staged` check fails if a
 staged copy differs from the working copy the other checks read.
 
 Its `bench` check needs pyusb, which lives in `.venv/`;
-[tools/bench/README.md](tools/bench/README.md) says how to make it. Without it,
-the check is skipped, so `--require-all` fails.
+[tools/bench/README.md](tools/bench/README.md) says how to make it. Its `types`
+check needs typescript in `app/node_modules/`; [app/README.md](app/README.md)
+says how to install it. Without either, that check is skipped, so
+`--require-all` fails.
 
 ## The authority
 
@@ -33,8 +35,8 @@ not the authority.
   them.
 - A document may restate a value for its reader, beside the page it comes from.
   The facts file wins any disagreement, and no gate compares the two.
-- After changing it, run `python tools/generate.py`. The app's copy is
-  generated, and the gate fails until it matches.
+- After changing it, or a fixture, run `python tools/generate.py`. The app's
+  copies are generated, and the gate fails until they match.
 - Recordings of real sessions go in `protocol/traces/`, listed in its
   `SHA256SUMS`. Hand-written traces go in `protocol/fixtures/`, and are never
   evidence.

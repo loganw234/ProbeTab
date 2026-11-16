@@ -3,8 +3,10 @@
 - [check.py](check.py) is the gate: the one command that says whether the
   repository still holds together. Its docstring lists the checks and their
   limits.
-- [generate.py](generate.py) makes `app/src/generated/labpro-facts.ts` from
-  `protocol/labpro-facts.toml`. Run it after changing the facts; `--check`
+- [generate.py](generate.py) makes the app's copies of the protocol folder's
+  sources: `app/src/generated/labpro-facts.ts` from
+  `protocol/labpro-facts.toml`, and `app/test/generated/fixtures.ts` from
+  `protocol/fixtures/`. Run it after changing the facts or a fixture; `--check`
   writes nothing.
 - [labpro_facts.py](labpro_facts.py) reads the facts file. It is the one place
   that decides which tables are facts, and Python tools read values through it.
