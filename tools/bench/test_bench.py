@@ -243,7 +243,7 @@ class FirstContact(unittest.TestCase):
         first = self.reply()[0]
         status, printed = self.run_bench(self.fake([("OUT", 0, self.command_sent()), first]))
         self.assertEqual(status, 1)
-        self.assertIn(f"the reply stopped after {len(first[2])} bytes without its end", printed)
+        self.assertIn(f"the reply to Command 7 stopped after {len(first[2])} bytes without its end", printed)
         self.assertEqual(len(self.written().transfers), 2)
 
     def test_a_reply_of_sixteen_values_is_refused(self):
@@ -287,7 +287,7 @@ class FirstContact(unittest.TestCase):
         fake = self.fake([("OUT", 0, self.command_sent())] + filler)
         status, printed = self.run_bench(fake)
         self.assertEqual(status, 1)
-        self.assertIn(f"no end of reply in {bench.MAX_PACKETS} packets", printed)
+        self.assertIn(f"no end of reply to Command 7 in {bench.MAX_PACKETS} packets", printed)
         self.assertEqual(len(fake.remaining()), 1)
 
     def test_a_short_packet_is_named_and_the_reply_still_read(self):

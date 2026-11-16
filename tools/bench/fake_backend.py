@@ -11,8 +11,12 @@ What the device says is the trace's, in order:
   - a read when the next transfer is not an IN times out, as a read from a
     LabPro waits while it answers NAK (page 23).
 
-It also keeps what a test needs to see: the timeout of every transfer, and how
-often the device was opened and closed.
+It also keeps what a test needs to see: the timeout of every transfer, how
+often the device was opened and closed, and every descriptor asked for.
+
+It answers GET_DESCRIPTOR for the device, the configuration and the strings,
+with bytes built from its own fields, as USB lays them out. No other control
+request is expected, and any other raises Mismatch.
 
 A fixture is the lead's model of a LabPro, so a test that passes against one
 says the script agrees with that model, not with a LabPro. A recording from
@@ -23,6 +27,7 @@ codes, are this file's inventions, chosen so that a script relying on them
 would fail. Nothing here says what a LabPro reports for them.
 """
 import array
+import struct
 
 import usb.backend
 import usb.core
@@ -52,7 +57,21 @@ class FakeLabPro(usb.backend.IBackend):
 
     def __init__(self, trace, facts, name, *, devices=1, bulk_in=None, bulk_out=None, packet_size=None,
                  in_address=IN_ADDRESS, out_address=OUT_ADDRESS, configured=True, kernel_driver=False,
-                 take=None, write_timeout=False, read_error=None, unsupported=None):
+                 take=None, write_timeout=False, read_error=None, unsupported=None,
+                 manufacturer=None, product=None, serial=None, short_device=False, short_configuration=False,
+                 bad_total=False, interrupt_at=None, interruption=KeyboardInterrupt):
+        self.short_configuration = short_configuration  # the configuration's first, 9-byte read gives 8
+        self.bad_total = bad_total          # the configuration's total length says one byte more than it holds
+        self.interrupt_at = interrupt_at    # the read, counted from 1, at which interruption is raised:
+        self.interruption = interruption    # Ctrl-C by default, or an error the script does not name
+        self.reads = 0
+        # The device's strings, by the index its device descriptor gives each; 0 means none.
+        self.strings = {}
+        for index, text in enumerate((manufacturer, product, serial), start=1):
+            if text is not None:
+                self.strings[index] = text
+        self.short_device = short_device    # the device descriptor comes back a byte short
+        self.descriptors_asked = []         # (type, index, length) for every GET_DESCRIPTOR
         self.transfers = list(trace.transfers)
         self.facts = facts
         self.name = name
@@ -94,7 +113,9 @@ class FakeLabPro(usb.backend.IBackend):
         return Descriptor(bLength=18, bDescriptorType=usb.util.DESC_TYPE_DEVICE, bcdUSB=0x0110,
                           bDeviceClass=0xFF, bDeviceSubClass=0, bDeviceProtocol=0, bMaxPacketSize0=8,
                           idVendor=self.facts["usb.vendor_id"], idProduct=self.facts["usb.product_id"],
-                          bcdDevice=0x0100, iManufacturer=0, iProduct=0, iSerialNumber=0, bNumConfigurations=1,
+                          bcdDevice=0x0100, iManufacturer=1 if 1 in self.strings else 0,
+                          iProduct=2 if 2 in self.strings else 0, iSerialNumber=3 if 3 in self.strings else 0,
+                          bNumConfigurations=1,
                           address=5 + dev, bus=1, port_number=1 + dev, port_numbers=(1 + dev,),
                           speed=usb.util.SPEED_FULL)
 
@@ -144,6 +165,54 @@ class FakeLabPro(usb.backend.IBackend):
     def is_kernel_driver_active(self, dev_handle, intf):
         return self.kernel_driver
 
+    def device_bytes(self):
+        d = self.get_device_descriptor(0)
+        data = struct.pack("<BBHBBBBHHHBBBB", d.bLength, d.bDescriptorType, d.bcdUSB, d.bDeviceClass,
+                           d.bDeviceSubClass, d.bDeviceProtocol, d.bMaxPacketSize0, d.idVendor, d.idProduct,
+                           d.bcdDevice, d.iManufacturer, d.iProduct, d.iSerialNumber, d.bNumConfigurations)
+        return data[:-1] if self.short_device else data
+
+    def configuration_bytes(self):
+        c = self.get_configuration_descriptor(0, 0)
+        i = self.get_interface_descriptor(0, 0, 0, 0)
+        data = struct.pack("<BBHBBBBB", c.bLength, c.bDescriptorType, c.wTotalLength + self.bad_total, c.bNumInterfaces,
+                           c.bConfigurationValue, c.iConfiguration, c.bmAttributes, c.bMaxPower)
+        data += struct.pack("<BBBBBBBBB", i.bLength, i.bDescriptorType, i.bInterfaceNumber, i.bAlternateSetting,
+                            i.bNumEndpoints, i.bInterfaceClass, i.bInterfaceSubClass, i.bInterfaceProtocol,
+                            i.iInterface)
+        for e in self.endpoints:
+            data += struct.pack("<BBBBHB", e.bLength, e.bDescriptorType, e.bEndpointAddress, e.bmAttributes,
+                                e.wMaxPacketSize, e.bInterval)
+        return data
+
+    def string_bytes(self, index):
+        if index == 0:
+            return bytes([4, usb.util.DESC_TYPE_STRING, 0x09, 0x04])  # one language: US English
+        if index not in self.strings:
+            raise usb.core.USBError(f"the fake has no string {index}")
+        text = self.strings[index].encode("utf-16-le")
+        return bytes([2 + len(text), usb.util.DESC_TYPE_STRING]) + text
+
+    def ctrl_transfer(self, dev_handle, bmRequestType, bRequest, wValue, wIndex, data, timeout):
+        if bmRequestType != 0x80 or bRequest != 0x06:
+            raise Mismatch(f"the script made control request {bmRequestType:#04x} {bRequest:#04x}, "
+                           f"which is not GET_DESCRIPTOR")
+        kind, index = wValue >> 8, wValue & 0xFF
+        self.descriptors_asked.append((kind, index, len(data)))
+        if kind == usb.util.DESC_TYPE_DEVICE:
+            blob = self.device_bytes()
+        elif kind == usb.util.DESC_TYPE_CONFIG:
+            blob = self.configuration_bytes()
+            if self.short_configuration and len(data) == 9:
+                blob = blob[:8]
+        elif kind == usb.util.DESC_TYPE_STRING:
+            blob = self.string_bytes(index)
+        else:
+            raise usb.core.USBError(f"the fake has no descriptor of type {kind}")
+        count = min(len(blob), len(data))
+        data[:count] = array.array("B", blob[:count])
+        return count
+
     def packet_size(self, ep):
         return next(endpoint.wMaxPacketSize for endpoint in self.endpoints if endpoint.bEndpointAddress == ep)
 
@@ -165,6 +234,9 @@ class FakeLabPro(usb.backend.IBackend):
 
     def bulk_read(self, dev_handle, ep, intf, buff, timeout):
         self.timeouts.append(("IN", timeout))
+        self.reads += 1
+        if self.reads == self.interrupt_at:
+            raise self.interruption
         if usb.util.endpoint_direction(ep) != usb.util.ENDPOINT_IN:
             raise Mismatch(f"the script read from {ep:#04x}, an OUT endpoint")
         if len(buff) != self.packet_size(ep):

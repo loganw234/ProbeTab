@@ -18,6 +18,42 @@ export interface Fixture {
 }
 
 export const FIXTURES: Readonly<Record<string, Fixture>> = Object.freeze({
+  "ch1-reading.trace": Object.freeze({
+    model: "Reading CH1 as the bench script's --read-ch1 does it. In order: Command 7; Command 0, which returns nothing (page 30); Command 7 again; Command 1 for channel 1 by auto-ID, which returns nothing (pages 31 and 32); Command 7; Command 9 in mode 0 and Command 7; Command 9 in mode 1 and Command 7 (page 48). Each reply to Command 7 is page 46's first, idle with no error. Command 9's values are page 48's example values. Every command is framed s and a carriage return, as page 22 writes it for the serial port. The zeros after each carriage return are the lead's guess, and so is everything here about USB.",
+    transfers: Object.freeze([
+      Object.freeze({ direction: "OUT", micros: 0, bytes: "73 7b 37 7d 0d" }),
+      Object.freeze({ direction: "IN", micros: 50, bytes: "7b 20 2b 36 2e 30 31 31 32 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 38 2e 38 38 38 30 30 45 2b 30 33 2c 20 2b 30 2e 30 30 30" }),
+      Object.freeze({ direction: "IN", micros: 100, bytes: "30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20" }),
+      Object.freeze({ direction: "IN", micros: 150, bytes: "2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 31 2e 30 30 30 30 30" }),
+      Object.freeze({ direction: "IN", micros: 200, bytes: "45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 7d 0d 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" }),
+      Object.freeze({ direction: "OUT", micros: 1200, bytes: "73 7b 30 7d 0d" }),
+      Object.freeze({ direction: "OUT", micros: 2200, bytes: "73 7b 37 7d 0d" }),
+      Object.freeze({ direction: "IN", micros: 2250, bytes: "7b 20 2b 36 2e 30 31 31 32 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 38 2e 38 38 38 30 30 45 2b 30 33 2c 20 2b 30 2e 30 30 30" }),
+      Object.freeze({ direction: "IN", micros: 2300, bytes: "30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20" }),
+      Object.freeze({ direction: "IN", micros: 2350, bytes: "2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 31 2e 30 30 30 30 30" }),
+      Object.freeze({ direction: "IN", micros: 2400, bytes: "45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 7d 0d 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" }),
+      Object.freeze({ direction: "OUT", micros: 3400, bytes: "73 7b 31 2c 31 2c 31 7d 0d" }),
+      Object.freeze({ direction: "OUT", micros: 4400, bytes: "73 7b 37 7d 0d" }),
+      Object.freeze({ direction: "IN", micros: 4450, bytes: "7b 20 2b 36 2e 30 31 31 32 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 38 2e 38 38 38 30 30 45 2b 30 33 2c 20 2b 30 2e 30 30 30" }),
+      Object.freeze({ direction: "IN", micros: 4500, bytes: "30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20" }),
+      Object.freeze({ direction: "IN", micros: 4550, bytes: "2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 31 2e 30 30 30 30 30" }),
+      Object.freeze({ direction: "IN", micros: 4600, bytes: "45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 7d 0d 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" }),
+      Object.freeze({ direction: "OUT", micros: 5600, bytes: "73 7b 39 2c 31 2c 30 7d 0d" }),
+      Object.freeze({ direction: "IN", micros: 5650, bytes: "7b 20 2b 31 2e 39 34 33 38 33 45 2b 30 30 20 7d 0d 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" }),
+      Object.freeze({ direction: "OUT", micros: 6650, bytes: "73 7b 37 7d 0d" }),
+      Object.freeze({ direction: "IN", micros: 6700, bytes: "7b 20 2b 36 2e 30 31 31 32 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 38 2e 38 38 38 30 30 45 2b 30 33 2c 20 2b 30 2e 30 30 30" }),
+      Object.freeze({ direction: "IN", micros: 6750, bytes: "30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20" }),
+      Object.freeze({ direction: "IN", micros: 6800, bytes: "2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 31 2e 30 30 30 30 30" }),
+      Object.freeze({ direction: "IN", micros: 6850, bytes: "45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 7d 0d 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" }),
+      Object.freeze({ direction: "OUT", micros: 7850, bytes: "73 7b 39 2c 31 2c 31 7d 0d" }),
+      Object.freeze({ direction: "IN", micros: 7900, bytes: "7b 20 2b 31 2e 38 34 30 30 35 45 2b 30 30 20 7d 0d 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" }),
+      Object.freeze({ direction: "OUT", micros: 8900, bytes: "73 7b 37 7d 0d" }),
+      Object.freeze({ direction: "IN", micros: 8950, bytes: "7b 20 2b 36 2e 30 31 31 32 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 38 2e 38 38 38 30 30 45 2b 30 33 2c 20 2b 30 2e 30 30 30" }),
+      Object.freeze({ direction: "IN", micros: 9000, bytes: "30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20" }),
+      Object.freeze({ direction: "IN", micros: 9050, bytes: "2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 31 2e 30 30 30 30 30" }),
+      Object.freeze({ direction: "IN", micros: 9100, bytes: "45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 2c 20 2b 30 2e 30 30 30 30 30 45 2b 30 30 7d 0d 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00" }),
+    ]),
+  }),
   "status-request.trace": Object.freeze({
     model: "Command 7 and its reply, as page 46 shows them after a reset. The command is s{7} and the carriage return page 22 puts after a serial command. The reply is its 17 values in braces, then a carriage return, which page 23 says is where a reader of an ASCII reply stops. It is read 64 bytes at a time, because transfers to the host come in multiples of 64 (page 22). The zeros after the carriage return are the lead's guess, and so is everything here about USB.",
     transfers: Object.freeze([

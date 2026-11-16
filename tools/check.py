@@ -145,10 +145,16 @@ The checks, by name, each with what it cannot see:
              Nothing else sits in either folder, apart from SHA256SUMS and
              FORMAT.md in protocol/traces/ and README.md in protocol/fixtures/.
              tools/traces.py's writer refuses what would not read back as
-             given, and --control holds it to that.
-             Limit: a fixture copied into protocol/traces/ with a recording's
-             header passes. Which traces were recorded is the lead's ledger's
-             record, not the gate's.
+             given, and --control holds it to that. A header's device lines
+             hold to FORMAT.md: a device descriptor of 18 bytes, a
+             configuration descriptor as long as it says, and a serial masked
+             as tools/traces.py's rule keeps it.
+             Limits:
+               - a fixture copied into protocol/traces/ with a recording's
+                 header passes. Which traces were recorded is the lead's
+                 ledger's record, not the gate's;
+               - a descriptor's fields beyond its length and type are not
+                 checked.
   generated  app/src/generated/labpro-facts.ts and app/test/generated/fixtures.ts
              are exactly what tools/generate.py makes of
              protocol/labpro-facts.toml and of the fixtures in
@@ -185,7 +191,9 @@ The checks, by name, each with what it cannot see:
                - the script's paths through a real backend, such as libusb,
                  are not run;
                - what the tests assert is not read here, only whether they
-                 pass; --control plants faults they must catch.
+                 pass; --control plants faults they must catch;
+               - a test deleted from a file that still runs, or a test file
+                 deleted, goes unnoticed; review has to catch those.
   app        The app's tests pass, and its simulated LabPro stays apart from
              its protocol code:
                - each app/test/*.test.ts runs alone, in a node process of its
@@ -207,7 +215,14 @@ The checks, by name, each with what it cannot see:
                - an import whose path is built at run time, such as from a
                  template literal, or one reached through createRequire or
                  import.meta.resolve, is not followed;
-               - the tests themselves are not type-checked (see types).
+               - the tests themselves are not type-checked (see types);
+               - a test file that prints node's summary itself and exits 0
+                 passes. That is forgery, which the threat model below leaves
+                 to review;
+               - an "imports" entry (a #name) in app/package.json can lead the
+                 fake to the protocol code without this check seeing it;
+               - a test deleted from a file that still runs goes unnoticed;
+                 review has to catch it.
   types      app/src type-checks under tsc --noEmit with app/tsconfig.json,
              which allows erasable syntax only, so an enum, a namespace with
              code or a parameter property fails it, as it would fail Node. The
@@ -217,7 +232,8 @@ The checks, by name, each with what it cannot see:
              @ts-nocheck, @ts-ignore or @ts-expect-error, which would hide
              errors from tsc. A tsc still running after 300 seconds fails by
              name.
-             Limit: app/test is not type-checked; that needs Node's own types
+             Limits: tsc's timeout has no control of its own; and
+             app/test is not type-checked, since that needs Node's own types
              (@types/node), which are not installed.
 
 --history scans each commit in RANGE: its author and committer names and
@@ -1664,8 +1680,75 @@ def plant_utf32_run(root, files, ctx):
 
 
 def plant_bench_sends_a_reset(root, files, ctx):
-    edit(root, BENCH + "labpro_bench.py", r'facts\["command\.request_system_status"\]', 'facts["command.reset"]',
-         within="def first_contact")
+    edit(root, BENCH + "labpro_bench.py", r'self\.facts\["command\.request_system_status"\]',
+         'self.facts["command.reset"]', within="    def status(self)")
+    return files
+
+
+def plant_bench_resetting_a_busy_unit(root, files, ctx):
+    edit(root, BENCH + "labpro_bench.py", r'RESETTABLE = \("status\.state_idle", "status\.state_done"\)',
+         'RESETTABLE = ("status.state_idle", "status.state_done", "status.state_busy")', within="RESETTABLE")
+    return files
+
+
+def plant_discard_resetting_a_busy_unit(root, files, ctx):
+    edit(root, BENCH + "labpro_bench.py", r"if name not in RESETTABLE:", "if name not in RESETTABLE and not discard:",
+         within="def read_ch1")
+    return files
+
+
+def plant_ch1_reply_corrupted(root, files, ctx):
+    """Command 9's first value in the CH1 fixture, +1.94383E+00, loses its leading digit to an x."""
+    edit(root, FIXTURES + "ch1-reading.trace", r"7b 20 2b 31 2e 39 34 33 38 33", "7b 20 2b 78 2e 39 34 33 38 33",
+         within="# probetab-fixture 1")
+    return files
+
+
+def recording_with(line):
+    """A recording's text with one header line added, written by hand so that the writer cannot refuse it."""
+    text = traces.write("trace", RECORDING_HEADER, [("OUT", 0, b"s{7}\r"), ("IN", 1532, b"{ 1.0}\r")])
+    head, rest = text.split("\n", 1)
+    return f"{head}\n{line}\n{rest}"
+
+
+def plant_short_device_line(root, files, ctx):
+    plant_recording(root, text=recording_with("# device: " + " ".join(["12", "01"] + ["00"] * 15)))
+    return walked_files(root)
+
+
+def plant_unmasked_serial(root, files, ctx):
+    plant_recording(root, text=recording_with("# serial: ABC12345XY"))
+    return walked_files(root)
+
+
+def plant_device_line_of_another_type(root, files, ctx):
+    plant_recording(root, text=recording_with("# device: " + " ".join(["12", "02"] + ["00"] * 16)))
+    return walked_files(root)
+
+
+def plant_configuration_total_disagreeing(root, files, ctx):
+    """A configuration line whose total-length field says 32 bytes, holding 31."""
+    plant_recording(root, text=recording_with("# configuration: " + " ".join(["09", "02", "20", "00"] + ["00"] * 27)))
+    return walked_files(root)
+
+
+def plant_bench_resetting_an_initializing_unit(root, files, ctx):
+    edit(root, BENCH + "labpro_bench.py", r'WAITING = \("status\.state_initializing", "status\.state_self_test"\)',
+         'WAITING = ("status.state_self_test",)', within="WAITING")
+    edit(root, BENCH + "labpro_bench.py", r'RESETTABLE = \("status\.state_idle", "status\.state_done"\)',
+         'RESETTABLE = ("status.state_idle", "status.state_done", "status.state_initializing")', within="RESETTABLE")
+    return files
+
+
+def plant_bench_every_unbounded(root, files, ctx):
+    edit(root, BENCH + "labpro_bench.py", r"if value > MAX_EVERY:", "if False:", within="def interval")
+    return files
+
+
+def plant_bench_losing_the_trace_to_an_error(root, files, ctx):
+    """main writes the trace only when phase0 returns, as it did before the finally."""
+    edit(root, BENCH + "labpro_bench.py", r"    try:\n        phase0\(facts, args, backend, say, run\)\n    finally:\n",
+         "    phase0(facts, args, backend, say, run)\n    if True:\n", within="    run = Run()")
     return files
 
 
@@ -1862,6 +1945,25 @@ CONTROLS = [
     ("bench", "the bench tests skipped", plant_bench_tests_skipped, "unittest reports OK (skipped="),
     ("bench", "a failure that shows a scratch path", plant_bench_failure_showing_a_path,
      "'zzplanted' not found in 'refused: <temp>"),
+    ("bench", "the bench script resetting a busy unit", plant_bench_resetting_a_busy_unit,
+     "test_armed_and_busy_are_never_reset"),
+    ("bench", "--discard resetting a busy unit", plant_discard_resetting_a_busy_unit,
+     "test_armed_and_busy_are_never_reset"),
+    ("bench", "the CH1 fixture's reply to Command 9 corrupted", plant_ch1_reply_corrupted,
+     "test_reads_ch1_as_the_fixture_has_it"),
+    ("traces", "a recording whose device line is 17 bytes", plant_short_device_line,
+     "a device descriptor is 18 bytes; this one is 17"),
+    ("traces", "a recording with its serial unmasked", plant_unmasked_serial, "serial 'ABC12345XY' is not masked"),
+    ("traces", "a recording whose device line is of another type", plant_device_line_of_another_type,
+     "a device descriptor begins 12 01; this one begins 12 02"),
+    ("traces", "a recording whose configuration line disagrees with its total", plant_configuration_total_disagreeing,
+     "its total length says 32 bytes, but the line holds 31"),
+    ("bench", "the bench script resetting an initializing unit", plant_bench_resetting_an_initializing_unit,
+     "test_initializing_is_read_again_until_idle"),
+    ("bench", "the bench script taking an --every without bound", plant_bench_every_unbounded,
+     "test_every_is_bounded_and_for_is_not"),
+    ("bench", "the bench script losing the trace to an error it does not name",
+     plant_bench_losing_the_trace_to_an_error, "test_an_unnamed_error_keeps_the_trace_and_goes_on"),
     ("app", "an enum in the app", plant_app_enum, "ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX"),
     ("app", "an import without its .ts", plant_import_without_extension, "ERR_MODULE_NOT_FOUND"),
     ("app", "a failing app test", plant_failing_app_test, "a write reaches the device's end as one piece, copied:"),
@@ -2082,7 +2184,7 @@ BUILT_CONTROLS = [
     ("bench", "no Python with pyusb", build_bench_without_pyusb, "skip",
      "the bench script's tests are not run"),
     ("generated", "a generator that writes a fixture byte wrong, consistently", build_fixtures_mutant, "fail",
-     "round trip: status-request.trace loads from app/test/generated/fixtures.ts unlike"),
+     "loads from app/test/generated/fixtures.ts unlike protocol/fixtures/"),
     ("types", "no typescript installed", build_types_without_typescript, "skip", "app/src is not type-checked"),
     ("app", "an app test that hangs", build_hanging_app_test, "fail",
      "app/test/memory.test.ts: did not finish within 3 s"),

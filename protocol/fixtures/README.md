@@ -1,8 +1,15 @@
 # protocol/fixtures/
 
 Hand-written traces: the lead's model of what passes between a host and a
-LabPro, written from the manual before any LabPro was connected. Tests use them
-in place of a device:
+LabPro, written from the manual before any LabPro was connected. There are two:
+
+- `status-request.trace`: Command 7 and its reply, as page 46 shows them;
+- `ch1-reading.trace`: CH1 read as the bench script's `--read-ch1` does it.
+  - the reset, channel 1 by auto-ID, and Command 9 in both modes;
+  - Command 7 between each, its replies page 46's first, and Command 9's
+    values from page 48's example.
+
+Tests use them in place of a device:
 
 - [tools/bench/](../../tools/bench/README.md) replays `status-request.trace`
   through a fake pyusb backend;

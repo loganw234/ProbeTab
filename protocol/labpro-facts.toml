@@ -196,9 +196,9 @@ evidence = "1k samples per second max. 6 channels active"
 status = "manual"
 
 # Power. The specification table on page 74 lists its labels and its values
-# in two columns that text extraction misaligns. Each pairing below is the
-# lead's reading of the table's order, and is a verifier's item until the
-# bench or a rendering of the page confirms it.
+# in two columns, which pdftotext -layout misaligns. pdftotext -table pairs
+# each row as below (2026-11-16), so the pairing no longer rests on the lead's
+# reading of the table's order.
 
 [power.supply]
 value = "6 V DC regulated, 600 mA, or four AA alkaline cells"
@@ -290,6 +290,22 @@ page = 22
 evidence = "a carriage return character follows each command"
 status = "manual"
 note = "Said of the serial port. Whether USB needs the carriage return is for the bench to show."
+
+[command.reset_reply]
+value = "nothing"
+source = "trm"
+page = 30
+evidence = "Return values: No information is returned."
+status = "manual"
+note = "Said of Command 0. The bench script listens briefly after it, and records anything that comes."
+
+[command.channel_setup_reply]
+value = "nothing"
+source = "trm"
+page = 32
+evidence = "Return values: No information is returned."
+status = "manual"
+note = "Said of Command 1. The bench script listens briefly after it, and records anything that comes."
 
 [command.open]
 value = "{"
@@ -418,6 +434,74 @@ evidence = "8888 Constant value."
 status = "manual"
 note = "Page 45's table does not number its rows. The place is the row's, counted by the lead, and page 46's example reply has 8888 fourth."
 
+[status.error_position]
+value = 2
+unit = "place in the reply, counting from 1"
+source = "trm"
+page = 45
+evidence = "error If non-zero, LabPro should be reset and the cause of the error corrected."
+status = "manual"
+note = "Page 45's table does not number its rows. The place is the row's, counted by the lead."
+
+[status.system_state_position]
+value = 14
+unit = "place in the reply, counting from 1"
+source = "trm"
+page = 45
+evidence = "system state The following values are used for the system state:"
+status = "manual"
+note = "Page 45's table does not number its rows. The place is the row's, counted by the lead, and page 46's example reply has 1, idle, fourteenth."
+
+[status.state_idle]
+value = 1
+source = "trm"
+page = 45
+evidence = "1 Idle 2 Armed 3 Busy 4 Done 5 Self-test 99 Initializing code"
+status = "manual"
+
+[status.state_armed]
+value = 2
+source = "trm"
+page = 45
+evidence = "1 Idle 2 Armed 3 Busy 4 Done 5 Self-test 99 Initializing code"
+status = "manual"
+
+[status.state_busy]
+value = 3
+source = "trm"
+page = 45
+evidence = "1 Idle 2 Armed 3 Busy 4 Done 5 Self-test 99 Initializing code"
+status = "manual"
+
+[status.state_done]
+value = 4
+source = "trm"
+page = 45
+evidence = "1 Idle 2 Armed 3 Busy 4 Done 5 Self-test 99 Initializing code"
+status = "manual"
+
+[status.state_self_test]
+value = 5
+source = "trm"
+page = 45
+evidence = "1 Idle 2 Armed 3 Busy 4 Done 5 Self-test 99 Initializing code"
+status = "manual"
+
+[status.state_initializing]
+value = 99
+source = "trm"
+page = 45
+evidence = "1 Idle 2 Armed 3 Busy 4 Done 5 Self-test 99 Initializing code"
+status = "manual"
+
+[status.quicksetup_flag]
+value = 16
+unit = "added to the system state"
+source = "trm"
+page = 45
+evidence = "Add 16 to the value if the last mode was QuickSetup."
+status = "manual"
+
 [status.unretrieved_data_flag]
 value = 32
 unit = "added to the system state"
@@ -470,6 +554,14 @@ evidence = "The default sampling time is 0.5 second."
 status = "manual"
 
 # Command 1's operations for an analog channel, and Command 9's modes
+
+[channel.ch1]
+value = 1
+source = "trm"
+page = 31
+evidence = "Analog channels 1 through 4"
+status = "manual"
+note = "The port labelled CH1 (page 6) is channel number 1."
 
 [channel.operation_auto_id]
 value = 1

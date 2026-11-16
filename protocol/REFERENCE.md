@@ -277,8 +277,9 @@ Each is a question for the bench, not something to code around.
 2. The bytes Command 7 returns over USB, including how its reply sits in 64-byte
    packets, and the unit's software ID.
 3. Whether binary-mode samples arrive as raw bytes or as hexadecimal text.
-4. Whether Command 9's value is the sensor's reading or its identification
-   value.
+4. What Command 9's value is. Page 48 calls it the sensor's current value; the
+   bench settles whether that is a reading in the sensor's units or a raw
+   voltage, with known voltages from a bench supply.
 5. Which order of channel and operation Command 1 takes.
 6. How fast real-time samples arrive over USB on the hosts that matter.
 7. How a reply ends: whether a line feed follows its carriage return.

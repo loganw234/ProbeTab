@@ -35,6 +35,18 @@ Its bytes are made up for the example; they are not a recording.
   - a fixture has `date`, and `model`: what it models and which manual pages it
     follows;
   - either may add one `note`;
+  - either may add what the device says of itself, each line at most once:
+    - `device` and `configuration`: the device descriptor and the configuration
+      descriptor, in the same hex as a transfer's bytes. A `device` line is 18
+      bytes, beginning `12 01`. A `configuration` line begins `09 02`, and is as
+      long as its own total-length field, in its third and fourth bytes, says.
+    - `manufacturer` and `product`: the device's strings, as text.
+    - `serial`, masked. Only its first 3 and last 2 characters show, and every
+      other character is `*`. A serial of 5 characters or fewer is masked
+      whole. It reads `none` when the device has no serial, and `unreadable`
+      when it could not be read. The counts are the owner's ruling (2026-11-16):
+      model information only. `tools/traces.py` holds them, and a trace already
+      written keeps the mask it was written with.
   - any other key is refused. No key holds a hostname, a user name or a path,
     and the gate's privacy check reads the values like any other text.
 - Keys are lower-case letters. A value is printable text that begins with a

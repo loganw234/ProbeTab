@@ -11,10 +11,17 @@ import sys
 from dataclasses import dataclass
 
 KINDS = {"# probetab-trace 1": "trace", "# probetab-fixture 1": "fixture"}
+DEVICE_KEYS = ("device", "configuration", "manufacturer", "product", "serial")
 HEADER_KEYS = {
-    "trace": {"required": ("date", "os", "stack", "firmware"), "optional": ("note",)},
-    "fixture": {"required": ("date", "model"), "optional": ("note",)},
+    "trace": {"required": ("date", "os", "stack", "firmware"), "optional": ("note",) + DEVICE_KEYS},
+    "fixture": {"required": ("date", "model"), "optional": ("note",) + DEVICE_KEYS},
 }
+# The serial number keeps this many characters at its start and at its end, and every
+# other character becomes MASK; a serial no longer than the two together is masked whole.
+# The owner's ruling, 2026-11-16: model information only. Change the counts here alone.
+SERIAL_KEPT = (3, 2)
+MASK = "*"
+SERIAL_ABSENT = ("none", "unreadable")
 HEADER = re.compile(r"# ([a-z]+): (\S.*)")
 TRANSFER = re.compile(r"(OUT|IN) (0|[1-9][0-9]*)((?: [^ ]+)*)")
 BYTE = re.compile(r"[0-9a-f]{2}")
@@ -27,6 +34,46 @@ class TraceError(ValueError):
     def __init__(self, line, message):
         super().__init__(f"line {line}: {message}")
         self.line = line
+
+
+def mask_serial(serial):
+    """serial with every character masked but the first and last SERIAL_KEPT, or wholly
+    masked when it is no longer than those two together."""
+    head, tail = SERIAL_KEPT
+    if len(serial) <= head + tail:
+        return MASK * len(serial)
+    return serial[:head] + MASK * (len(serial) - head - tail) + serial[len(serial) - tail:]
+
+
+def descriptor_problem(key, value):
+    """Why a device header line does not hold to the format, or None if it does."""
+    if key in ("manufacturer", "product"):
+        return None
+    if key == "serial":
+        if value in SERIAL_ABSENT or (value and mask_serial(value) == value):
+            return None
+        head, tail = SERIAL_KEPT
+        return (f"serial {value!r} is not masked: only its first {head} and last {tail} characters may "
+                f"show, or none when it has {head + tail} or fewer, or it reads {' or '.join(SERIAL_ABSENT)}")
+    tokens = value.split(" ")
+    bad = [token for token in tokens if not BYTE.fullmatch(token)]
+    if bad:
+        return f"{key}: {bad[0]!r} is not a byte; a byte is two lower-case hex digits"
+    data = bytes(int(token, 16) for token in tokens)
+    if key == "device":
+        if len(data) != 18:
+            return f"device: a device descriptor is 18 bytes; this one is {len(data)}"
+        if data[0] != 18 or data[1] != 1:
+            return f"device: a device descriptor begins 12 01; this one begins {data[0]:02x} {data[1]:02x}"
+    if key == "configuration":
+        if len(data) < 9:
+            return f"configuration: a configuration descriptor is 9 bytes or more; this one is {len(data)}"
+        if data[0] != 9 or data[1] != 2:
+            return f"configuration: a configuration descriptor begins 09 02; this one begins {data[0]:02x} {data[1]:02x}"
+        total = data[2] | data[3] << 8
+        if total != len(data):
+            return f"configuration: its total length says {total} bytes, but the line holds {len(data)}"
+    return None
 
 
 @dataclass
@@ -73,6 +120,11 @@ def parse(text):
         datetime.datetime.fromisoformat(header["date"])
     except ValueError:
         raise TraceError(where["date"], f"date {header['date']!r} is not a real date and time") from None
+    for key in DEVICE_KEYS:
+        if key in header:
+            problem = descriptor_problem(key, header[key])
+            if problem:
+                raise TraceError(where[key], problem)
     transfers, last = [], 0
     for index in range(index, len(lines)):
         match = TRANSFER.fullmatch(lines[index])
