@@ -1,0 +1,67 @@
+# Publishes the app's pages to GitHub Pages: the landing page (app/index.html), the bench page and
+# its rehearsal (app/bench/), and the JavaScript tsc builds for them (app/web/), laid out as app/
+# is, so that every relative path in the pages works unchanged. Nothing else of the repository is
+# published there.
+#
+# It runs the app's tests and both builds first, and deploys only when all of them pass. The
+# custom domain is set in the repository's Pages settings: with a workflow like this one, GitHub
+# neither needs nor reads a CNAME file (GitHub's custom-domain docs, read 2026-11-18). Each action
+# is pinned to the commit its release tag named on 2026-11-18, read with git ls-remote. GitHub's
+# configure-pages action is left out: the site uses nothing it provides (BELIEVED). The deploy job
+# runs only for main, so a run by hand on another branch builds and tests but publishes nothing.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22.19.0"
+      - name: Install TypeScript, as app/package-lock.json locks it
+        working-directory: app
+        run: npm ci --ignore-scripts
+      - name: Run the app's tests
+        run: node --test app/test/*.test.ts
+      - name: Build the bench page and its rehearsal
+        working-directory: app
+        run: |
+          node node_modules/typescript/bin/tsc -p tsconfig.build.json
+          node node_modules/typescript/bin/tsc -p tsconfig.rehearse.json
+      - name: Lay out the site as app/ is laid out
+        run: |
+          mkdir _site
+          cp app/index.html _site/
+          cp -r app/bench app/web _site/
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

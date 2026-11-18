@@ -44,6 +44,9 @@ page runs a build of them, which tsc makes (see [The bench page](#the-bench-page
     and its Save.
 - [bench/index.html](bench/index.html) is the page, and
   [tsconfig.build.json](tsconfig.build.json) is how it is built.
+- [index.html](index.html) is the published site's landing page, written for
+  teachers and students. It says what ProbeTab will do, and lists the bench page
+  and its rehearsal under "For testers".
 - [test/](test/) runs it all on Node. It uses
   [a simulated LabPro](test/fake-labpro.ts), which replays a fixture from
   `protocol/fixtures/` through [a generated copy](test/generated/fixtures.ts).
@@ -143,6 +146,23 @@ gate fails when those steps and the script drift apart. It does not run
 `page.ts`, whose order it retypes, so a change to that order shows only in the
 rehearsal by hand. The gate does not build the rehearsal, or type-check its two
 files in `test/`; tsc does both when it builds the rehearsal.
+
+## The published site
+
+[.github/workflows/pages.yml](../.github/workflows/pages.yml) publishes three
+things to GitHub Pages, laid out as this folder is:
+
+- `index.html`, the landing page;
+- `bench/`, the bench page and its rehearsal;
+- `web/`, the JavaScript tsc builds for them.
+
+It runs on each push to `main`, and by hand. It runs the app's tests and both
+builds first, and deploys only when all of them pass, and only from `main`. A
+run by hand on another branch builds and tests, and publishes nothing. Nothing
+else of the repository is published there.
+
+The site's domain is set in the repository's Pages settings, not by a file
+here. Those settings, and the domain's DNS records, are the owner's.
 
 ## Limits
 

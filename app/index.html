@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProbeTab</title>
+<meta name="description" content="Classroom sensors in a browser tab: a free, open-source app for the Vernier LabPro.">
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.55; }
+  body { margin: 0 auto; max-width: 40rem; padding: 2rem 1rem 3rem; }
+  h1 { font-size: 2.2rem; margin: 0; }
+  h2 { font-size: 1.3rem; margin-top: 2.2rem; }
+  .lede { font-size: 1.2rem; margin-top: 0.4rem; }
+  .status { padding: 0.8rem 1rem; border-left: 5px solid #d08000; background: #d0800018; }
+  li { margin: 0.3rem 0; }
+  footer { margin-top: 3rem; font-size: 0.9rem; opacity: 0.85; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ProbeTab</h1>
+  <p class="lede">Classroom sensors in a browser tab. ProbeTab is a free, open-source app being built
+    for the Vernier LabPro, the box that links classroom sensors to a computer. It is meant to run in
+    a web browser on a computer or a Chromebook, with nothing to install.</p>
+
+  <p class="status"><strong>Not ready for classrooms yet.</strong> ProbeTab is being built now,
+    and has not yet been used with a real LabPro.</p>
+
+  <h2>What it will do</h2>
+  <ul>
+    <li>Connect to a LabPro over USB, straight from the browser.</li>
+    <li>Show readings as a live graph and a table.</li>
+    <li>Save a run as a spreadsheet file.</li>
+    <li>Work with a keyboard and with a screen reader.</li>
+  </ul>
+
+  <h2>For testers</h2>
+  <p>These pages are technical on purpose. They check ProbeTab against a LabPro one command at a
+    time, and they are not the classroom app.</p>
+  <ul>
+    <li><a href="bench/">The bench page</a> is built to talk to a LabPro over USB, in Chrome or
+      Edge.</li>
+    <li><a href="bench/rehearse.html">The rehearsal</a> is the same page with a pretend LabPro, so it
+      runs with no hardware at all.</li>
+  </ul>
+
+  <h2>Follow along</h2>
+  <p>The code and its notes are on <a href="https://github.com/loganw234/ProbeTab">GitHub</a>.</p>
+</main>
+<footer>
+  <p>ProbeTab is an independent project. It is not affiliated with, or endorsed by, Vernier or
+    Texas Instruments.</p>
+</footer>
+</body>
+</html>
