@@ -13,7 +13,7 @@ syntax only, so no enums, namespaces or parameter properties, and imports that
 name their `.ts` files. The tests run the `.ts` files as they are. The bench
 page runs a build of them, which tsc makes (see [The bench page](#the-bench-page)).
 
-## What is here (2026-11-16)
+## What is here (2026-11-18)
 
 - [src/transport/transport.ts](src/transport/transport.ts): the transport
   interface. A transport opens, closes, writes bytes, and reads the next bytes
@@ -48,13 +48,20 @@ page runs a build of them, which tsc makes (see [The bench page](#the-bench-page
   [a simulated LabPro](test/fake-labpro.ts), which replays a fixture from
   `protocol/fixtures/` through [a generated copy](test/generated/fixtures.ts).
   The simulated LabPro shares no code with `src/protocol/`.
+- The rehearsal ([below](#the-rehearsal)) puts that simulated LabPro under the
+  bench page in a browser:
+  - [bench/rehearse.html](bench/rehearse.html) shows the bench page in a frame;
+  - [test/rehearsal-device.ts](test/rehearsal-device.ts) is the stand-in for
+    the browser's WebUSB, and
+    [test/rehearsal-install.ts](test/rehearsal-install.ts) puts it in place;
+  - [tsconfig.rehearse.json](tsconfig.rehearse.json) is how it is built.
 
 ## Running the tests
 
 The tests need only Node with type stripping, which Node 22.19 has by default.
 From the repository's root:
 
-    node --test app/test/memory.test.ts app/test/status.test.ts app/test/webusb.test.ts app/test/bench.test.ts
+    node --test app/test/memory.test.ts app/test/status.test.ts app/test/webusb.test.ts app/test/bench.test.ts app/test/rehearsal.test.ts
 
 The gate's `app` check runs each `app/test/*.test.ts` alone, in a node process
 of its own, and requires node's summary from each. A file that holds no tests,
@@ -98,13 +105,53 @@ transfer kept.
 One connection per page: reload the page for another, so that a record is never
 replaced unsaved.
 
+## The rehearsal
+
+The bench page in a browser with a simulated LabPro in place of a LabPro, for
+use before Phase 0. It shows whether the page's buttons, its log and its Save
+work end to end. It shows nothing about a LabPro: the simulated LabPro is the
+lead's model, and so is everything it answers.
+
+1. **Build it.** From this folder, after the page's build:
+
+       node node_modules/typescript/bin/tsc -p tsconfig.rehearse.json
+
+   That writes its JavaScript into `web/rehearsal/`.
+2. **Serve it** as the page is served: `python tools/bench/serve.py`.
+3. **Open** `http://127.0.0.1:8000/bench/rehearse.html`.
+   - It shows the bench page, unchanged, in a frame, under a banner.
+   - Each time the frame loads, it adds one script to it, which puts
+     [the stand-in](test/rehearsal-device.ts) where the browser's WebUSB would
+     be.
+   - The banner says how far the simulated LabPro has got.
+4. **Follow its script:** Connect, then Read CH1 with a live reading of 12
+   readings, at any interval.
+   - The simulated LabPro replays
+     [bench-rehearsal.trace](../protocol/fixtures/bench-rehearsal.trace), and
+     stops answering at the first command the fixture does not hold. Reload the
+     page for a fresh one.
+   - A refusal that sends nothing, such as a live reading with no end, leaves
+     the script where it was.
+
+Its device calls itself "ProbeTab rehearsal", so a saved record says where it
+came from. `tools/bench/from_browser.py` writes such a record only outside
+`protocol/traces/`, with a note saying it is a rehearsal and not a recording.
+
+[test/rehearsal.test.ts](test/rehearsal.test.ts) runs `session.ts`'s steps
+against the same stand-in on Node, in the order `page.ts` calls them, so the
+gate fails when those steps and the script drift apart. It does not run
+`page.ts`, whose order it retypes, so a change to that order shows only in the
+rehearsal by hand. The gate does not build the rehearsal, or type-check its two
+files in `test/`; tsc does both when it builds the rehearsal.
+
 ## Limits
 
 - **The tests run on Node, not in a browser.** The WebUSB transport runs
-  against a simulated device. The bench page is first run in a browser at
-  Phase 0.
-  - Its steps and its record are tested on Node.
-  - Its glue to the page, `page.ts`, is not.
+  against a simulated device.
+  - The bench page's steps and its record are tested on Node.
+  - Its glue to the page, `page.ts`, is not. The rehearsal ran it in a browser
+    on 2026-11-18, by hand, against the simulated LabPro (MEASURED). Against a
+    LabPro, it first runs at Phase 0.
 - **The WebUSB declarations in `webusb.ts`, and the client-hint declarations in
   `record.ts`, are this project's own.** TypeScript's DOM library has neither.
   They are written from the lead's knowledge of the APIs, not checked against
@@ -139,7 +186,20 @@ replaced unsaved.
 - **Each transfer's time** is when the page took it from WebUSB, not when it
   reached the computer.
 - **No check holds the page's HTML to its code.** The ids `page.ts` looks up,
-  and the built script's path, were checked by hand on 2026-11-16.
+  and the built script's path, were checked by hand on 2026-11-16. In the
+  rehearsal of 2026-11-18, the page started, which it does only when it finds
+  every id, and each button was pressed (MEASURED).
+- **A live reading's interval is a wait, not a period.** After each reading's
+  reply the page listens 0.3 s for anything more, and only then waits the
+  interval, as the bench script does (READ, `tools/bench/labpro_bench.py`). In
+  the rehearsal, an interval of 0.5 s gave readings about 0.8 s apart, and 0
+  gave them about 0.3 s apart (MEASURED, in a browser pane that was hidden,
+  where timers may run late).
+- **The transfers table is redrawn when a step ends,** so it does not grow
+  during a live reading. The log does (MEASURED, in the rehearsal).
+- **Save hands the record to the browser,** which may ask before it saves. In
+  the rehearsal, the saved file was the page's bytes exactly (MEASURED,
+  SHA-256).
 - **A trace's `os` line is what the browser's hints say.** On Windows 11,
   Chromium gave "Windows 15.0.0" (MEASURED, 2026-11-16).
 - **The simulated LabPro is the lead's model, built from a fixture.** Passing

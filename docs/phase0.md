@@ -35,6 +35,11 @@ On the MacBook, from the repository's root, at the latest `main`:
      read PASS.
 6. **The bench page's build:** in `app/`, run
    `node node_modules/typescript/bin/tsc -p tsconfig.build.json`.
+   - **To rehearse the page first,** with no LabPro, also run
+     `node node_modules/typescript/bin/tsc -p tsconfig.rehearse.json`, serve the
+     page as in section 5, and open `http://127.0.0.1:8000/bench/rehearse.html`.
+     [app/README.md](../app/README.md) says what it shows. Its records are not
+     evidence.
 7. **Chrome.**
 
 ## The bench, and safety

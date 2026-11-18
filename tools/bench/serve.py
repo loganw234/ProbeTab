@@ -3,7 +3,8 @@
 
     python tools/bench/serve.py [--port N]
 
-It serves two folders of app/ and nothing else: bench/, the page, and web/,
+It serves two folders of app/ and nothing else: bench/, the bench page and its
+rehearsal (rehearse.html), and web/,
 the JavaScript that tsc builds from app/src/ (app/README.md says how to build
 it). It binds to 127.0.0.1, so no other computer can reach it. Open
 http://127.0.0.1:N/bench/ in Chrome or Edge: WebUSB needs a secure origin, and

@@ -196,6 +196,28 @@ class Converter(unittest.TestCase):
         self.assertIn("protocol/fixtures/ holds fixtures only", printed)
         self.assertFalse(out.exists())
 
+    def test_a_record_from_a_device_is_noted_as_recorded(self):
+        status, printed = self.run_converter(record())
+        self.assertEqual(status, 0, printed)
+        self.assertTrue(self.written().header["note"].startswith("recorded by the bench page in a browser"))
+
+    def test_a_rehearsal_s_record_is_noted_as_a_rehearsal(self):
+        status, printed = self.run_converter(record(manufacturer=" " + from_browser.REHEARSAL + " "))
+        self.assertEqual(status, 0, printed)
+        note = self.written().header["note"]
+        self.assertTrue(note.startswith("a rehearsal, not a recording"), note)
+        self.assertIn("framed as s-cr", note)
+
+    def test_a_rehearsal_s_record_is_never_written_among_the_recordings(self):
+        (self.root / "protocol" / "traces").mkdir()
+        out = self.root / "protocol" / "traces" / "browser.trace"
+        status, printed = self.run_converter(record(manufacturer=from_browser.REHEARSAL), out=out)
+        self.assertEqual(status, 1)
+        self.assertIn("protocol/traces/ holds recordings of a LabPro only", printed)
+        self.assertFalse(out.exists())
+        status, printed = self.run_converter(record(), out=out)
+        self.assertEqual(status, 0, printed)
+
 
 class Server(unittest.TestCase):
     def setUp(self):
@@ -311,6 +333,10 @@ class Constants(unittest.TestCase):
         self.assertEqual(ts_list(text, "SERIAL_ABSENT"), list(traces.SERIAL_ABSENT))
         self.assertIn(f'export const MASK = "{traces.MASK}";', text)
         self.assertIn(f'export const RECORD_FORMAT = "{from_browser.FORMAT}";', text)
+
+    def test_the_converter_knows_the_rehearsal_s_device_by_its_name(self):
+        text = ts_text("app/test/rehearsal-device.ts")
+        self.assertIn(f'export const MANUFACTURER = "{from_browser.REHEARSAL}";', text)
 
 
 if __name__ == "__main__":

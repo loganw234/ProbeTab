@@ -151,8 +151,10 @@ The checks, by name, each with what it cannot see:
              as tools/traces.py's rule keeps it.
              Limits:
                - a fixture copied into protocol/traces/ with a recording's
-                 header passes. Which traces were recorded is the lead's
-                 ledger's record, not the gate's;
+                 header passes, and so does a trace of the bench page's
+                 rehearsal copied there by hand, which tools/bench/
+                 from_browser.py will not write there. Which traces were
+                 recorded is the lead's ledger's record, not the gate's;
                - a descriptor's fields beyond its length and type are not
                  checked.
   generated  app/src/generated/labpro-facts.ts and app/test/generated/fixtures.ts

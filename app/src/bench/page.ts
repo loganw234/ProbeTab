@@ -1,6 +1,7 @@
 // The bench page's glue to the browser: its buttons, its log and its record. The steps are
 // in session.ts and the evidence in record.ts, which the tests run on Node. This file is not
-// tested on Node, and is first run in a browser at Phase 0.
+// tested on Node. The rehearsal (bench/rehearse.html) runs it in a browser against a simulated
+// LabPro; against a LabPro, it first runs at Phase 0.
 
 import { count } from "../protocol/facts.ts";
 import { FORMS, type Form } from "../protocol/status.ts";
@@ -212,7 +213,8 @@ buttons.save.addEventListener("click", () => {
   link.download = `probetab-bench-${open.date.replaceAll(":", "-")}.json`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-  say(`saved ${record.transfers.length} transfers as ${link.download}`);
+  say(`handed ${record.transfers.length} transfers to the browser to save as ${link.download}; `
+    + `the browser may ask first`);
 });
 
 buttons.disconnect.addEventListener("click", () => void step(async (open) => {

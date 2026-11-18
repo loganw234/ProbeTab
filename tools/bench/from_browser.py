@@ -11,7 +11,10 @@ tools/traces.py, so the trace format keeps one writer:
   - the device's strings are recorded by tools/traces.py's rule, and the serial
     number is masked by it again, whatever the page did;
   - the page's refusals and findings are not part of a trace, so they are read
-    and checked, but not written.
+    and checked, but not written;
+  - a record from the page's rehearsal (app/bench/rehearse.html), whose device
+    calls itself "ProbeTab rehearsal", is written with a note saying it is a
+    rehearsal and not a recording, and never into protocol/traces/.
 
 It refuses a record that is not exactly what the page writes, naming what is
 wrong. It never writes over a file, never writes among the fixtures, and writes
@@ -35,6 +38,7 @@ import traces  # noqa: E402
 
 FORMAT = "probetab-browser-record 1"   # as app/src/bench/record.ts's RECORD_FORMAT; a bench test holds the two
 FORMS = ("s-cr", "s", "cr", "bare")    # as tools/bench/labpro_bench.py's FORMS; a bench test holds the two
+REHEARSAL = "ProbeTab rehearsal"       # as app/test/rehearsal-device.ts's MANUFACTURER; a bench test holds the two
 KEYS = ("format", "date", "os", "stack", "firmware", "form", "manufacturer", "product", "serial",
         "refusals", "findings", "transfers")
 TRANSFER_KEYS = ("direction", "ms", "bytes")
@@ -131,13 +135,19 @@ def convert(record):
     serial = traces.device_string(text_of(record, "serial"))
     if serial not in traces.SERIAL_ABSENT:
         serial = traces.mask_serial(serial)
+    manufacturer = traces.device_string(text_of(record, "manufacturer"))
+    if manufacturer == REHEARSAL:
+        note = (f"a rehearsal, not a recording: the bench page against the simulated LabPro of "
+                f"app/bench/rehearse.html, written by tools/bench/from_browser.py; commands framed as {form}")
+    else:
+        note = (f"recorded by the bench page in a browser, and written by tools/bench/from_browser.py; "
+                f"commands framed as {form}")
     # The trace format's own writer holds the date, and every header value, to its rules.
     header = {
         "date": text_of(record, "date"), "os": text_of(record, "os"), "stack": text_of(record, "stack"),
         "firmware": text_of(record, "firmware"),
-        "note": f"recorded by the bench page in a browser, and written by tools/bench/from_browser.py; "
-                f"commands framed as {form}",
-        "manufacturer": traces.device_string(text_of(record, "manufacturer")),
+        "note": note,
+        "manufacturer": manufacturer,
         "product": traces.device_string(text_of(record, "product")),
         "serial": serial,
     }
@@ -160,6 +170,19 @@ def check_out(path, root):
     return out
 
 
+def check_rehearsal(header, out, root):
+    """Refused when a record from the page's rehearsal would be written among the recordings."""
+    if header["manufacturer"] != REHEARSAL:
+        return
+    try:
+        recordings = (Path(root) / "protocol" / "traces").resolve()
+    except OSError as exc:
+        raise Refused(f"protocol/traces/ cannot be found: {exc.strerror or exc}") from None
+    if out.is_relative_to(recordings):
+        raise Refused("this record is from the bench page's rehearsal, against a simulated LabPro, and "
+                      "protocol/traces/ holds recordings of a LabPro only")
+
+
 def main(argv=None, stdout=None, root=ROOT):
     stdout = stdout or sys.stdout
 
@@ -177,6 +200,7 @@ def main(argv=None, stdout=None, root=ROOT):
         except OSError as exc:
             raise Refused(f"the record cannot be read: {exc.strerror or exc}") from None
         header, transfers = convert(load(data))
+        check_rehearsal(header, out, root)
         try:
             text = traces.write("trace", header, transfers)
         except ValueError as exc:

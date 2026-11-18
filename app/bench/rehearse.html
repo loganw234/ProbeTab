@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProbeTab bench rehearsal</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; }
+  header { padding: 0.5rem 1rem; border-bottom: 4px solid #d08000; background: #d0800018; }
+  header > * { max-width: 72rem; margin: 0.3rem auto; }
+  h1 { font-size: 1.2rem; }
+  #state { font-family: ui-monospace, monospace; font-weight: 600; }
+  iframe { flex: 1; width: 100%; border: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Rehearsal: the bench page with a simulated LabPro</h1>
+  <p>The bench page below is the real one, unchanged. Its USB is a stand-in: a simulated LabPro
+    that replays <code>protocol/fixtures/bench-rehearsal.trace</code>, the lead's model of a LabPro,
+    written from the manual. Nothing here is evidence, and the record it saves names its device
+    "ProbeTab rehearsal".</p>
+  <p>Its script: Connect, then Read CH1 with a live reading of 12 readings, at any interval. A step
+    outside the script meets a LabPro that stops answering. Reload for a fresh one.</p>
+  <p id="state" role="status">Loading the bench page.</p>
+</header>
+<iframe id="bench" src="index.html" title="The bench page, with a simulated LabPro"></iframe>
+<script>
+  // This script runs while the page is parsed, right after the frame, so its listener is in
+  // place before the frame can finish loading. Each time the frame loads, the listener adds the
+  // rehearsal's script to it, and what that script tells is shown above the frame.
+  const frame = document.getElementById("bench");
+  const state = document.getElementById("state");
+  frame.addEventListener("load", () => {
+    const page = frame.contentDocument;
+    if (page === null) {
+      state.textContent = "refused: the bench page's frame cannot be reached";
+      return;
+    }
+    const script = page.createElement("script");
+    script.type = "module";
+    script.src = "../web/rehearsal/test/rehearsal-install.js";
+    script.addEventListener("error", () => {
+      state.textContent = "refused: the rehearsal's script did not load; app/README.md says how to build it";
+    });
+    page.head.append(script);
+  });
+  window.addEventListener("message", (event) => {
+    if (event.origin === location.origin && event.source === frame.contentWindow
+        && typeof event.data?.rehearsal === "string") {
+      state.textContent = event.data.rehearsal;
+    }
+  });
+</script>
+</body>
+</html>

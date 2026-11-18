@@ -134,6 +134,15 @@ The bench page takes the same steps in Chrome or Edge, over WebUSB.
   - It never writes over a file, or among the fixtures.
   - The page's refusals and findings are checked, but are not part of a trace,
     so they are not written.
+  - A record from the page's rehearsal, whose device calls itself "ProbeTab
+    rehearsal", gets a note saying it is a rehearsal and not a recording, and
+    is never written into `protocol/traces/`.
+  - Both refusals compare resolved paths, in the same way.
+    - On Windows, a path into `protocol/traces/` spelled in another case
+      resolved to that folder, and was refused (MEASURED by a verifier,
+      2026-11-18).
+    - On a Mac, whose disks ignore case by default, a path spelled in another
+      case is BELIEVED to get past either refusal. That is not tested.
 - **A browser trace has no `device` or `configuration` line.** The page records
   the strings WebUSB gives it, not the raw descriptors. The bench script records
   both, when given `--descriptors`.
