@@ -1656,23 +1656,29 @@ def manual_page(root, ctx, number):
     return pages[number - 1]
 
 
+PLANTED_DOC = "docs/planted-run.md"
+
+
+def plant_in_a_doc(root, text):
+    """Plant text as line 1 of a file of its own, so that no tracked file's length moves the line."""
+    append(root, PLANTED_DOC, text + "\n")
+    return walked_files(root)
+
+
 def plant_pasted_manual_sentence(root, files, ctx):
-    append(root, "docs/README.md", "\n" + " ".join(manual_page(root, ctx, 22).split()[40:52]) + "\n")
-    return files
+    return plant_in_a_doc(root, " ".join(manual_page(root, ctx, 22).split()[40:52]))
 
 
 def plant_run_of_eight(root, files, ctx):
     words = words_of(manual_page(root, ctx, 22))[40:48]
-    append(root, "docs/README.md", "\nzzplanted " + " ".join(words) + " zzplanted\n")
-    return files
+    return plant_in_a_doc(root, "zzplanted " + " ".join(words) + " zzplanted")
 
 
 def plant_zero_width_run(root, files, ctx):
     words = words_of(manual_page(root, ctx, 22))[40:56]
     split = [word[0] + chr(0x200B) + word[1:] if index % 5 == 4 and len(word) > 1 else word
              for index, word in enumerate(words)]
-    append(root, "docs/README.md", "\n" + " ".join(split) + "\n")
-    return files
+    return plant_in_a_doc(root, " ".join(split))
 
 
 def plant_utf16_run(root, files, ctx):
@@ -1716,14 +1722,12 @@ def plant_accented_run(root, files, ctx):
     for word in words:
         index = next(i for i, ch in enumerate(word) if ch in ACCENTED)
         accented.append(word[:index] + ACCENTED[word[index]] + word[index + 1:])
-    append(root, "docs/README.md", "\n" + " ".join(accented) + "\n")
-    return files
+    return plant_in_a_doc(root, " ".join(accented))
 
 
 def plant_joiner_run(root, files, ctx):
     words = manual_run(root, ctx, 12, keep=lambda word: len(word) > 1)
-    append(root, "docs/README.md", "\n" + " ".join(word[0] + chr(0x034F) + word[1:] for word in words) + "\n")
-    return files
+    return plant_in_a_doc(root, " ".join(word[0] + chr(0x034F) + word[1:] for word in words))
 
 
 def plant_utf32_run(root, files, ctx):
@@ -2026,16 +2030,16 @@ CONTROLS = [
     ("generated", "an integer beyond JavaScript's safe ones", plant_unsafe_integer,
      "beyond the integers JavaScript holds exactly"),
     ("reference", "a sentence pasted from the manual", plant_pasted_manual_sentence,
-     "docs/README.md:8: shares a run of"),
+     f"{PLANTED_DOC}:1: shares a run of"),
     ("reference", "an evidence phrase copied into a comment", plant_evidence_in_a_comment,
      "shares a run of"),
-    ("reference", "a run of exactly eight words", plant_run_of_eight, "docs/README.md:8: shares a run of 8 words"),
-    ("reference", "zero-width spaces inside the words", plant_zero_width_run, "docs/README.md:8: shares a run of"),
+    ("reference", "a run of exactly eight words", plant_run_of_eight, f"{PLANTED_DOC}:1: shares a run of 8 words"),
+    ("reference", "zero-width spaces inside the words", plant_zero_width_run, f"{PLANTED_DOC}:1: shares a run of"),
     ("reference", "a passage in a UTF-16 file", plant_utf16_run, "docs/notes.txt:1: shares a run of"),
     ("reference", "an evidence-shaped line inside a note", plant_evidence_line_in_a_note,
      "protocol/labpro-facts.toml:"),
-    ("reference", "an accented letter in every word", plant_accented_run, "docs/README.md:8: shares a run of"),
-    ("reference", "a combining grapheme joiner in every word", plant_joiner_run, "docs/README.md:8: shares a run of"),
+    ("reference", "an accented letter in every word", plant_accented_run, f"{PLANTED_DOC}:1: shares a run of"),
+    ("reference", "a combining grapheme joiner in every word", plant_joiner_run, f"{PLANTED_DOC}:1: shares a run of"),
     ("reference", "a passage in a UTF-32 file", plant_utf32_run, "docs/notes32.txt:1: shares a run of"),
     ("bench", "the bench script sending a reset", plant_bench_sends_a_reset, "the script sent"),
     ("bench", "the fixture's reply changed", plant_fixture_reply_changed, "status.check_value"),
