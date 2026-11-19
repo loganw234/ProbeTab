@@ -62,8 +62,8 @@ page runs a build of them, which tsc makes (see [The bench page](#the-bench-page
   app's page may look like, for the owner to react to. It is visual only: the
   buttons do nothing, and every reading is made up from the formula in its
   comment. A switcher in its banner shows four states (before connecting,
-  connected, collecting, finished). It is not published, and the landing page
-  does not link it. [test/mockup.test.ts](test/mockup.test.ts) holds that it
+  connected, collecting, finished). The site publishes it at `mockup/`, and the
+  landing page does not link it. [test/mockup.test.ts](test/mockup.test.ts) holds that it
   loads nothing from another site in the forms the test reads (its header names
   those it misses), that its table is that formula, and that it says it is a
   mockup. It has not been tried with a screen reader or on a
@@ -159,12 +159,13 @@ files in `test/`; tsc does both when it builds the rehearsal.
 
 ## The published site
 
-[.github/workflows/pages.yml](../.github/workflows/pages.yml) publishes three
+[.github/workflows/pages.yml](../.github/workflows/pages.yml) publishes four
 things to GitHub Pages, laid out as this folder is:
 
 - `index.html`, the landing page;
 - `bench/`, the bench page and its rehearsal;
-- `web/`, the JavaScript tsc builds for them.
+- `web/`, the JavaScript tsc builds for them;
+- `mockup/`, the mockup of the classroom app's page, whose buttons do nothing.
 
 It runs on each push to `main`, and by hand. It runs the app's tests and both
 builds first, and deploys only when all of them pass, and only from `main`. A

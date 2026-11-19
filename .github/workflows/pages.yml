@@ -1,7 +1,7 @@
 # Publishes the app's pages to GitHub Pages: the landing page (app/index.html), the bench page and
-# its rehearsal (app/bench/), and the JavaScript tsc builds for them (app/web/), laid out as app/
-# is, so that every relative path in the pages works unchanged. Nothing else of the repository is
-# published there.
+# its rehearsal (app/bench/), the JavaScript tsc builds for them (app/web/), and the mockup of the
+# classroom app's page (app/mockup/), laid out as app/ is, so that every relative path in the pages
+# works unchanged. Nothing else of the repository is published there.
 #
 # It runs the app's tests and both builds first, and deploys only when all of them pass. The
 # custom domain is set in the repository's Pages settings: with a workflow like this one, GitHub
@@ -47,7 +47,7 @@ jobs:
         run: |
           mkdir _site
           cp app/index.html _site/
-          cp -r app/bench app/web _site/
+          cp -r app/bench app/web app/mockup _site/
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site
