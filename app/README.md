@@ -58,6 +58,15 @@ page runs a build of them, which tsc makes (see [The bench page](#the-bench-page
     the browser's WebUSB, and
     [test/rehearsal-install.ts](test/rehearsal-install.ts) puts it in place;
   - [tsconfig.rehearse.json](tsconfig.rehearse.json) is how it is built.
+- [mockup/index.html](mockup/index.html) is a picture of what the classroom
+  app's page may look like, for the owner to react to. It is visual only: the
+  buttons do nothing, and every reading is made up from the formula in its
+  comment. A switcher in its banner shows four states (before connecting,
+  connected, collecting, finished). It is not published, and the landing page
+  does not link it. [test/mockup.test.ts](test/mockup.test.ts) holds that it
+  loads nothing from another site, that its table is that formula, and that it
+  says it is a mockup. It has not been tried with a screen reader or on a
+  Chromebook.
 
 ## Running the tests
 
