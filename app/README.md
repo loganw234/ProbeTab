@@ -64,8 +64,9 @@ page runs a build of them, which tsc makes (see [The bench page](#the-bench-page
   comment. A switcher in its banner shows four states (before connecting,
   connected, collecting, finished). It is not published, and the landing page
   does not link it. [test/mockup.test.ts](test/mockup.test.ts) holds that it
-  loads nothing from another site, that its table is that formula, and that it
-  says it is a mockup. It has not been tried with a screen reader or on a
+  loads nothing from another site in the forms the test reads (its header names
+  those it misses), that its table is that formula, and that it says it is a
+  mockup. It has not been tried with a screen reader or on a
   Chromebook.
 
 ## Running the tests

@@ -5,9 +5,12 @@
 // url(...) or @import that begins with a scheme ("https:", "data:", "javascript:" ...) or with "//".
 //
 // What the net cannot see: a URL built by script (the page holds no script, which a test below checks);
-// an address in an attribute outside the list (object data=, meta refresh content=); a relative path
-// that the server maps to another site; text a reader follows by hand, such as a printed address;
-// CSS written with escapes (a backslash inside the url) or split across lines inside a quoted string.
+// an address in an attribute outside the list (object data=, meta refresh content=, body background=);
+// a URL in a CSS string outside url() and @import, such as image-set("https://..."); a scheme written
+// with character references, such as &#104;ttps:; a relative path that the server maps to another
+// site; text a reader follows by hand, such as a printed address; CSS written with escapes (a backslash
+// inside the url) or split across lines inside a quoted string. verifier-mockup planted the body
+// background, image-set and character-reference forms on 2026-11-19, and each got past the net.
 // It reads text, not the browser's own parse, so it can mistake an attribute written inside a comment
 // for a real one: it errs towards finding too much.
 import { test } from "node:test";

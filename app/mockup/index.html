@@ -7,8 +7,9 @@
 <meta name="description" content="A picture of what the ProbeTab classroom app may look like. The buttons do nothing and the readings are made up.">
 <!--
   A MOCKUP, not the app: no USB, no LabPro, no saving. Every reading below is made up.
-  This page stands alone: it loads nothing from anywhere else (no fonts, scripts, images or links out),
-  and app/test/mockup.test.ts fails if a reference to another site is added.
+  This page stands alone: it loads nothing from anywhere else (no fonts, scripts, images or links out).
+  app/test/mockup.test.ts fails if a reference to another site is added in a form its net reads;
+  the test's header names the forms it misses.
   The state switcher in the banner is pure CSS (radio buttons and :has()), so this page holds no script at all.
 
   FORMULA: T(t) = 22 + 53*exp(-t/150) + 0.3*sin(t/4), t in seconds, shown to 0.1
