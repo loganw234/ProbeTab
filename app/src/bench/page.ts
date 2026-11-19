@@ -131,7 +131,7 @@ function showStatus(values: readonly string[]): void {
 buttons.connect.addEventListener("click", () => void step(async () => {
   const usb = browser.usb;
   if (usb === undefined) {
-    throw new Error("this browser offers no WebUSB; Chrome and Edge do, on a page served from localhost");
+    throw new Error("this browser offers no WebUSB on this page, and the bench page needs it; Chrome and Edge have WebUSB");
   }
   const device = await requestLabPro(usb) as NamedDevice;
   const transport = new WebUsbTransport(device);
