@@ -22,6 +22,11 @@ A fixture is the lead's model of a LabPro, so a test that passes against one
 says the script agrees with that model, not with a LabPro. A recording from
 the bench can be replayed the same way.
 
+One thing it can do beyond replaying, when asked to with command_1_errors: set
+the error register. See CHANNELS and FakeLabPro.error. That is the lead's model
+of a LabPro, BELIEVED and not measured, so it is off unless a test asks, and a
+replay of a recording never has a reply rewritten.
+
 The descriptors' other fields, such as the endpoint addresses and the class
 codes, are this file's inventions, chosen so that a script relying on them
 would fail. Nothing here says what a LabPro reports for them.
@@ -35,6 +40,14 @@ import usb.util
 
 IN_ADDRESS = 0x82   # invented: a LabPro's addresses are for the bench to show
 OUT_ADDRESS = 0x01  # invented, and numbered apart from IN_ADDRESS on purpose
+# BELIEVED, the lead's model and not a measurement: a unit that is told to set up a channel
+# page 31's list does not hold sets its error register (page 45 says it is non-zero after a
+# fault) and keeps it until Command 0 clears the error state (page 30). Page 31 lists the
+# channels 0, 1 to 4, 11 and 12, 21 and 22, and 31 and 32. Typed here, not in the facts
+# file, because it is part of the model and not a fact the script may rely on. The code the
+# fake sets is invented: the manual's pages give none for this fault.
+CHANNELS = frozenset({0, 1, 2, 3, 4, 11, 12, 21, 22, 31, 32})
+ERROR_CODE = 1
 
 
 class Mismatch(AssertionError):
@@ -59,7 +72,9 @@ class FakeLabPro(usb.backend.IBackend):
                  in_address=IN_ADDRESS, out_address=OUT_ADDRESS, configured=True, kernel_driver=False,
                  take=None, write_timeout=False, read_error=None, unsupported=None,
                  manufacturer=None, product=None, serial=None, short_device=False, short_configuration=False,
-                 bad_total=False, interrupt_at=None, interruption=KeyboardInterrupt):
+                 bad_total=False, interrupt_at=None, interruption=KeyboardInterrupt, command_1_errors=False):
+        self.command_1_errors = command_1_errors  # model the error register, as the comment on CHANNELS says
+        self.error = 0                      # the error register the model holds
         self.short_configuration = short_configuration  # the configuration's first, 9-byte read gives 8
         self.bad_total = bad_total          # the configuration's total length says one byte more than it holds
         self.interrupt_at = interrupt_at    # the read, counted from 1, at which interruption is raised:
@@ -230,7 +245,59 @@ class FakeLabPro(usb.backend.IBackend):
         if sent != want:
             raise Mismatch(f"the script sent {sent.hex(' ')}, where {self.name} has OUT {want.hex(' ')}")
         self.transfers.pop(0)
+        if self.command_1_errors:
+            self.model_error(sent)
         return len(sent) if self.take is None else min(self.take, len(sent))
+
+    def model_error(self, sent):
+        """Keeps the error register of the model on CHANNELS, and puts it into the reply to Command 7
+        that the trace holds next, in place of the register the trace holds there."""
+        facts = self.facts
+        text = sent.decode("ascii", "replace")
+        start, end = text.find(facts["command.open"]), text.rfind(facts["command.close"])
+        if start < 0 or end < start:
+            return
+        try:
+            numbers = [int(part) for part in text[start + 1:end].split(facts["command.separator"])]
+        except ValueError:
+            return
+        if numbers[0] == facts["command.reset"]:
+            self.error = 0
+        elif numbers[0] == facts["command.channel_setup"] and len(numbers) > 1 and numbers[1] not in CHANNELS:
+            self.error = ERROR_CODE
+        elif numbers[0] == facts["command.request_system_status"] and self.error:
+            self.place_error()
+
+    def place_error(self):
+        """Rewrites the register at status.error_position in the replay's next reply, keeping every
+        packet's length."""
+        facts = self.facts
+        count, terminator = 0, facts["reply.terminator"].encode("ascii")
+        joined = b""
+        while count < len(self.transfers) and self.transfers[count][0] == "IN":
+            joined += self.transfers[count][2]
+            count += 1
+            if terminator in joined:
+                break
+        if terminator not in joined:
+            return
+        separator = facts["command.separator"].encode("ascii")
+        at = joined.index(facts["command.open"].encode("ascii")) + 1
+        for _ in range(facts["status.error_position"] - 1):
+            at = joined.index(separator, at) + 1
+        stop = min(place for place in (joined.find(separator, at), joined.find(facts["command.close"].encode("ascii"), at))
+                   if place >= 0)
+        spaces = len(joined[at:stop]) - len(joined[at:stop].lstrip())
+        kept = joined[at + spaces:stop]
+        new = f"{self.error:+.5E}".encode("ascii")
+        if len(new) != len(kept):
+            raise Mismatch(f"the fake cannot put {new!r} where {self.name} has {kept!r}")
+        joined = joined[:at + spaces] + new + joined[stop:]
+        place = 0
+        for index in range(count):
+            direction, when, old = self.transfers[index]
+            self.transfers[index] = (direction, when, joined[place:place + len(old)])
+            place += len(old)
 
     def bulk_read(self, dev_handle, ep, intf, buff, timeout):
         self.timeouts.append(("IN", timeout))

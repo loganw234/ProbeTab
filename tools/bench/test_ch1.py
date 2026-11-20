@@ -8,6 +8,7 @@ by changing its own replies; a test whose variant holds fewer commands than the 
 fails on the fake's Mismatch, which is how a reset the guard should have refused shows up.
 """
 import argparse
+import array
 import io
 import shutil
 import sys
@@ -21,7 +22,7 @@ sys.path.insert(0, str(HERE.parent))
 import labpro_bench as bench  # noqa: E402
 import labpro_facts  # noqa: E402
 import traces  # noqa: E402
-from fake_backend import FakeLabPro  # noqa: E402
+from fake_backend import IN_ADDRESS, OUT_ADDRESS, FakeLabPro  # noqa: E402
 
 REPO = HERE.parent.parent
 CH1 = "protocol/fixtures/ch1-reading.trace"
@@ -341,6 +342,244 @@ class ReadCh1(Bench):
             with self.subTest(arguments=arguments), self.assertRaises(SystemExit):
                 bench.main(["--out", str(self.out), *arguments], backend=self.fake([]), stdout=io.StringIO(),
                            root=self.root)
+
+
+class Command1(Bench):
+    """--operation and --order: what Command 1 sends, and what the fake's model of a unit makes of it."""
+
+    def command_1(self, *parameters):
+        """Command 1 in the s-cr framing, built here from the facts' strings and numbers."""
+        f = self.facts
+        numbers = (f["command.channel_setup"], *parameters)
+        return (f["command.prefix"] + f["command.open"] + f["command.separator"].join(str(n) for n in numbers)
+                + f["command.close"] + f["command.serial_terminator"]).encode("ascii")
+
+    def exchanges_with(self, sent):
+        """The CH1 fixture's exchanges, with Command 1 replaced by sent."""
+        exchanges = self.exchanges()
+        self.assertEqual(exchanges[3][0], self.command_1(self.facts["channel.ch1"],
+                                                         self.facts["channel.operation_auto_id"]))
+        exchanges[3][0] = sent
+        return exchanges
+
+    def command_1_sent(self):
+        """Command 1, the one OUT of the trace the run wrote whose number is Command 1's."""
+        f = self.facts
+        start = f["command.prefix"] + f["command.open"] + str(f["command.channel_setup"]) + f["command.separator"]
+        outs = [data for direction, _, data in self.written().transfers
+                if direction == "OUT" and data.decode("ascii").startswith(start)]
+        self.assertEqual(len(outs), 1)
+        return outs[0]
+
+    def test_the_voltage_operation_is_sent_by_its_fact(self):
+        f = self.facts
+        sent = self.command_1(f["channel.ch1"], f["channel.operation_voltage_0_5"])
+        self.assertNotEqual(sent, self.command_1(f["channel.ch1"], f["channel.operation_auto_id"]))
+        status, printed = self.run_bench(self.fake(self.exchanges_with(sent)), "--read-ch1", "--operation", "voltage")
+        self.assertEqual(status, 0, printed)
+        self.assertEqual(self.command_1_sent(), sent)
+
+    def test_auto_id_and_channel_first_are_the_defaults(self):
+        f = self.facts
+        sent = self.command_1(f["channel.ch1"], f["channel.operation_auto_id"])
+        for arguments in ([], ["--operation", "auto-id"], ["--order", "channel-first"]):
+            with self.subTest(arguments=arguments):
+                self.out = self.root / f"default-{len(arguments)}-{'-'.join(arguments)}.trace"
+                status, printed = self.run_bench(self.fake(self.exchanges()), "--read-ch1", *arguments)
+                self.assertEqual(status, 0, printed)
+                self.assertEqual(self.command_1_sent(), sent)
+
+    def test_operation_first_sends_the_parameters_the_other_way_round(self):
+        f = self.facts
+        first = self.command_1(f["channel.ch1"], f["channel.operation_voltage_0_5"])
+        other = self.command_1(f["channel.operation_voltage_0_5"], f["channel.ch1"])
+        self.assertNotEqual(first, other)
+        for order, sent in (("channel-first", first), ("operation-first", other)):
+            with self.subTest(order=order):
+                self.out = self.root / f"{order}.trace"
+                status, printed = self.run_bench(self.fake(self.exchanges_with(sent)), "--read-ch1",
+                                                 "--operation", "voltage", "--order", order)
+                self.assertEqual(status, 0, printed)
+                self.assertEqual(self.command_1_sent(), sent)
+
+    def test_operation_first_with_equal_values_sends_the_same_bytes(self):
+        """The map's Q5 as it stood: auto-ID's value equals the channel's, so the order cannot show."""
+        f = self.facts
+        self.assertEqual(f["channel.ch1"], f["channel.operation_auto_id"])
+        status, printed = self.run_bench(self.fake(self.exchanges()), "--read-ch1", "--order", "operation-first")
+        self.assertEqual(status, 0, printed)
+        self.assertEqual(self.command_1_sent(), self.command_1(f["channel.ch1"], f["channel.operation_auto_id"]))
+
+    def play(self, fake):
+        """The fake's next exchange, driven as a script would: the OUT it holds, then the packets of any
+        reply that follows. Returns those packets."""
+        sent = fake.transfers[0][2]
+        fake.bulk_write(None, OUT_ADDRESS, 0, sent, 100)
+        size, packets = self.facts["usb.packet_size"], []
+        while fake.transfers and fake.transfers[0][0] == "IN":
+            buffer = array.array("B", bytes(size))
+            packets.append(bytes(buffer[:fake.bulk_read(None, IN_ADDRESS, 0, buffer, 100)]))
+        return packets
+
+    def test_the_fake_models_page_31s_channels(self):
+        """The model's own test: Command 1 for a channel page 31 does not list sets the error register, which
+        Command 7 then shows until Command 0 clears it."""
+        f = self.facts
+        place = f["status.error_position"] - 1
+        for channel, listed in ((0, True), (1, True), (4, True), (11, True), (22, True), (32, True),
+                                (5, False), (14, False), (10, False), (33, False)):
+            with self.subTest(channel=channel):
+                exchanges = self.exchanges()
+                fake = self.fake([[self.command_1(channel, f["channel.operation_auto_id"]), []], exchanges[0],
+                                  exchanges[1], exchanges[2]], command_1_errors=True)
+                self.play(fake)
+                shown = float(self.values_in(self.play(fake))[place])
+                self.assertEqual(shown != 0, not listed, f"channel {channel}: error register {shown}")
+                self.play(fake)  # Command 0
+                self.assertEqual(float(self.values_in(self.play(fake))[place]), 0, "Command 0 did not clear it")
+
+    def test_the_model_is_off_unless_a_test_asks(self):
+        f = self.facts
+        exchanges = self.exchanges()
+        fake = self.fake([[self.command_1(14, 1), []], exchanges[0]])
+        self.play(fake)
+        self.assertEqual(float(self.values_in(self.play(fake))[f["status.error_position"] - 1]), 0)
+
+    def test_a_channel_page_31_does_not_list_stops_the_run_and_the_trace_keeps_the_bytes(self):
+        f = self.facts
+        wrong = self.command_1(f["channel.operation_voltage_0_5"], f["channel.ch1"])
+        fake = self.fake(self.exchanges_with(wrong)[:5], command_1_errors=True)
+        status, printed = self.run_bench(fake, "--read-ch1", "--operation", "voltage", "--order", "operation-first")
+        self.assertEqual(status, 1)
+        self.assertIn(f"after Command 1 ({f.cite('status.error_position')})", printed)
+        self.assertEqual(self.command_1_sent(), wrong)
+
+    def test_the_order_page_31_gives_draws_no_error_in_the_model(self):
+        f = self.facts
+        right = self.command_1(f["channel.ch1"], f["channel.operation_voltage_0_5"])
+        fake = self.fake(self.exchanges_with(right), command_1_errors=True)
+        status, printed = self.run_bench(fake, "--read-ch1", "--operation", "voltage")
+        self.assertEqual(status, 0, printed)
+        self.assertEqual(fake.remaining(), [])
+
+
+class Numbers(Bench):
+    """--applied and --meter, and the options that go only with --read-ch1."""
+
+    BAD = ("1e3", "1E3", "1,5", "abc", "-", ".5", "5.", "+1", "--1", "-.5", "1.2.3", "", " 1", "1 ", "1\n", "1_0",
+           "0x1", "nan", "inf", "١", "1" * 13, "-" + "1" * 12, "0." + "1" * 11)
+    GOOD = ("0", "1", "-1", "1.25", "-0.5", "00.10", "1" * 12, "-" + "1" * 11, "0." + "1" * 10)
+
+    def test_the_rule_takes_only_a_plain_number_of_twelve_characters_at_most(self):
+        for text in self.GOOD:
+            with self.subTest(good=text):
+                self.assertEqual(bench.volts(text), text)
+        for text in self.BAD:
+            with self.subTest(bad=text), self.assertRaises(argparse.ArgumentTypeError):
+                bench.volts(text)
+
+    def test_a_number_that_does_not_fit_is_refused_before_any_device_is_opened(self):
+        for option in ("--applied", "--meter"):
+            for text in self.BAD:
+                with self.subTest(option=option, text=text), self.assertRaises(SystemExit) as stopped:
+                    fake = self.fake([])
+                    try:
+                        bench.main(["--out", str(self.out), "--read-ch1", f"{option}={text}"], backend=fake,
+                                   stdout=io.StringIO(), root=self.root)
+                    finally:
+                        self.assertEqual(fake.opened, 0)
+                        self.assertFalse(self.out.exists())
+                self.assertEqual(stopped.exception.code, 2)
+
+    def test_the_options_for_read_ch1_are_refused_without_it(self):
+        for arguments in (["--operation", "voltage"], ["--operation", "auto-id"], ["--order", "operation-first"],
+                          ["--order", "channel-first"], ["--applied", "1.25"], ["--meter", "1.25"],
+                          ["--applied", "1.25", "--meter", "1.24"]):
+            with self.subTest(arguments=arguments), self.assertRaises(SystemExit) as stopped:
+                fake = self.fake([])
+                try:
+                    bench.main(["--out", str(self.out), *arguments], backend=fake, stdout=io.StringIO(), root=self.root)
+                finally:
+                    self.assertEqual(fake.opened, 0)
+            self.assertEqual(stopped.exception.code, 2)
+
+    def test_the_applied_voltage_and_the_meter_go_into_the_note_as_typed(self):
+        note = "Command 7 framed as s-cr"
+        for arguments, expected in ((["--applied", "1.25"], note + "; applied 1.25 V"),
+                                    (["--meter", "-0.50"], note + "; meter -0.50 V"),
+                                    (["--applied", "1.25", "--meter", "00.10"], note + "; applied 1.25 V; meter 00.10 V"),
+                                    ([], note)):
+            with self.subTest(arguments=arguments):
+                self.out = self.root / f"note-{len(arguments)}-{'-'.join(arguments)}.trace"
+                status, printed = self.run_bench(self.fake(self.exchanges()), "--read-ch1", *arguments)
+                self.assertEqual(status, 0, printed)
+                self.assertEqual(self.written().header["note"], expected)
+
+    def test_the_numbers_follow_the_text_the_script_wrote_before(self):
+        status, printed = self.run_bench(self.fake(self.exchanges(), configured=False), "--read-ch1",
+                                         "--applied", "2.5", "--meter", "2.49")
+        self.assertEqual(status, 0, printed)
+        note = self.written().header["note"]
+        self.assertTrue(note.startswith("Command 7 framed as s-cr; pyusb could not read"), note)
+        self.assertTrue(note.endswith("before it; applied 2.5 V; meter 2.49 V"), note)
+
+    def test_the_numbers_are_kept_when_the_run_is_refused(self):
+        flag = self.facts["status.unretrieved_data_flag"]
+        fake = self.fake([self.status_exchange(self.facts["status.state_idle"] + flag)])
+        status, printed = self.run_bench(fake, "--read-ch1", "--applied", "1.25")
+        self.assertEqual(status, 1)
+        self.assertEqual(self.written().header["note"], "Command 7 framed as s-cr; applied 1.25 V")
+
+
+class StateLine(Bench):
+    """The line every run prints after its first Command 7."""
+
+    LABELS = {"status.state_idle": "idle", "status.state_armed": "armed", "status.state_busy": "busy",
+              "status.state_done": "done", "status.state_self_test": "self-test",
+              "status.state_initializing": "initializing"}
+
+    def test_every_state_and_flag_is_named_without_read_ch1(self):
+        f = self.facts
+        for name, label in self.LABELS.items():
+            for quick in (False, True):
+                for unretrieved in (False, True):
+                    state = f[name] + quick * f["status.quicksetup_flag"] + unretrieved * f["status.unretrieved_data_flag"]
+                    expected = (f"state: {label}; QuickSetup flag {'set' if quick else 'clear'}; "
+                                f"unretrieved-data flag {'set' if unretrieved else 'clear'}")
+                    with self.subTest(state=state):
+                        self.out = self.root / f"state-{state:g}.trace"
+                        status, printed = self.run_bench(self.fake([self.status_exchange(state)]))
+                        self.assertEqual(status, 0, printed)
+                        self.assertEqual([line for line in printed.splitlines() if line.startswith("state: ")],
+                                         [expected])
+
+    def test_a_state_no_fact_gives_is_printed_as_such_and_the_run_goes_on(self):
+        status, printed = self.run_bench(self.fake([self.status_exchange(7)]))
+        self.assertEqual(status, 0, printed)
+        self.assertIn("is no state page 45 gives", printed)
+        self.assertIn("the run goes on", printed)
+        self.assertNotIn("refused", printed)
+        self.assertEqual(len(self.written().transfers), 5)
+
+    def test_with_read_ch1_the_guard_still_refuses_it_once(self):
+        status, printed = self.run_bench(self.fake([self.status_exchange(7)]), "--read-ch1")
+        self.assertEqual(status, 1)
+        self.assertEqual(printed.count("is no state page 45 gives"), 1)
+        self.assertNotIn("the run goes on", printed)
+
+    def test_the_line_comes_after_the_values_and_before_the_reset(self):
+        status, printed = self.run_bench(FakeLabPro(self.fixture(), self.facts, CH1), "--read-ch1")
+        self.assertEqual(status, 0, printed)
+        lines = printed.splitlines()
+        line = next(place for place, text in enumerate(lines) if text.startswith("state: "))
+        self.assertEqual(lines[line], "state: idle; QuickSetup flag clear; unretrieved-data flag clear")
+        self.assertLess(max(place for place, text in enumerate(lines) if text.startswith("  ")), line)
+        self.assertLess(line, next(place for place, text in enumerate(lines) if "resetting it" in text))
+
+    def test_a_run_whose_command_7_draws_no_reply_prints_no_state(self):
+        status, printed = self.run_bench(self.fake([[self.exchanges()[0][0], []]]))
+        self.assertEqual(status, 1)
+        self.assertNotIn("state: ", printed)
 
 
 class Descriptors(Bench):
