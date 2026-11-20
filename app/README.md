@@ -96,8 +96,11 @@ page runs a build of them, which tsc makes (see [The bench page](#the-bench-page
     it. Two tabs open at once share the one run and can overwrite each other's
     (a stated limit). Thirty minutes at one reading a second is about 59,000
     characters of JSON (MEASURED, [collect-history.test.ts](test/collect-history.test.ts)).
-  - The page is not published: `pages.yml` does not copy `collect/`, which is
-    the owner's call. `python tools/bench/serve.py` serves it at `/collect/`.
+  - The site publishes it at `collect/`, and the landing page does not link
+    it. `python tools/bench/serve.py` serves it at `/collect/` as well.
+    Browsers keep `localStorage` per origin, so the published page and
+    `serve.py` each keep their own last run, and a move of the site to another
+    domain starts without one.
   - Its tests are `test/collect-*.test.ts`, with
     [collect-fakes.ts](test/collect-fakes.ts) (a storage, a failing storage and
     a clock driven by hand). `collect-page.test.ts` imports the mockup test's
@@ -194,12 +197,13 @@ files in `test/`; tsc does both when it builds the rehearsal.
 
 ## The published site
 
-[.github/workflows/pages.yml](../.github/workflows/pages.yml) publishes four
+[.github/workflows/pages.yml](../.github/workflows/pages.yml) publishes five
 things to GitHub Pages, laid out as this folder is:
 
 - `index.html`, the landing page;
 - `bench/`, the bench page and its rehearsal;
-- `web/`, the JavaScript tsc builds for them;
+- `collect/`, the classroom screen, with practice readings only;
+- `web/`, the JavaScript tsc builds for `bench/` and `collect/`;
 - `mockup/`, the mockup of the classroom app's page, whose buttons do nothing.
 
 It runs on each push to `main`, and by hand. It runs the app's tests and both
