@@ -15,8 +15,9 @@ The bench script for Phase 0 with a LabPro, and its tests.
   one. It also answers requests for the device's descriptors.
   - **When a test asks,** it also models one fault: Command 1 for a channel
     that page 31's list does not hold sets the error register, until Command 0.
-    That is the lead's model, BELIEVED and not measured. It is off otherwise,
-    so a replayed recording is never rewritten.
+    It reads that list from the facts' `channel.numbers_*` rows. That is the
+    lead's model, BELIEVED and not measured. It is off otherwise, so a
+    replayed recording is never rewritten.
 - [test_bench.py](test_bench.py) and [test_ch1.py](test_ch1.py) run the script
   against the fake. The gate's `bench` check runs them.
 - **The browser bench page's Python side:**

@@ -22,7 +22,7 @@ sys.path.insert(0, str(HERE.parent))
 import labpro_bench as bench  # noqa: E402
 import labpro_facts  # noqa: E402
 import traces  # noqa: E402
-from fake_backend import IN_ADDRESS, OUT_ADDRESS, FakeLabPro  # noqa: E402
+from fake_backend import IN_ADDRESS, OUT_ADDRESS, FakeLabPro, channels  # noqa: E402
 
 REPO = HERE.parent.parent
 CH1 = "protocol/fixtures/ch1-reading.trace"
@@ -426,15 +426,20 @@ class Command1(Bench):
         Command 7 then shows until Command 0 clears it."""
         f = self.facts
         place = f["status.error_position"] - 1
-        for channel, listed in ((0, True), (1, True), (4, True), (11, True), (22, True), (32, True),
-                                (5, False), (14, False), (10, False), (33, False)):
+        # Every number page 31 gives, typed here on purpose as a second reading of the page, then the
+        # numbers just past the ends of its rows, and the 0 to 5 V operation's number, which the
+        # order test sends as a channel. The fake reads its channels from the facts, so a wrong row
+        # there fails here.
+        listed = (0, 1, 2, 3, 4, 11, 12, 21, 22, 31, 32)
+        outside = (5, 10, 13, 14, 20, 23, 30, 33)
+        for channel, held in [(number, True) for number in listed] + [(number, False) for number in outside]:
             with self.subTest(channel=channel):
                 exchanges = self.exchanges()
                 fake = self.fake([[self.command_1(channel, f["channel.operation_auto_id"]), []], exchanges[0],
                                   exchanges[1], exchanges[2]], command_1_errors=True)
                 self.play(fake)
                 shown = float(self.values_in(self.play(fake))[place])
-                self.assertEqual(shown != 0, not listed, f"channel {channel}: error register {shown}")
+                self.assertEqual(shown != 0, not held, f"channel {channel}: error register {shown}")
                 self.play(fake)  # Command 0
                 self.assertEqual(float(self.values_in(self.play(fake))[place]), 0, "Command 0 did not clear it")
 
@@ -461,6 +466,18 @@ class Command1(Bench):
         status, printed = self.run_bench(fake, "--read-ch1", "--operation", "voltage")
         self.assertEqual(status, 0, printed)
         self.assertEqual(fake.remaining(), [])
+
+    def test_the_models_channels_are_read_as_the_facts_file_writes_them(self):
+        # Made-up rows, not the facts: one number, two joined by a comma, and a range.
+        rows = {"one": "0", "two": "11, 12", "range": "1 - 4"}
+        self.assertEqual(channels(rows, rows=tuple(rows)), frozenset({0, 1, 2, 3, 4, 11, 12}))
+
+    def test_the_models_channels_hold_ch1_and_not_the_voltage_operation(self):
+        # The order test above rests on both: CH1's number is a channel page 31's table gives,
+        # and the 0 to 5 V operation's number, sent where the channel goes, is not.
+        held = channels(self.facts)
+        self.assertIn(self.facts["channel.ch1"], held)
+        self.assertNotIn(self.facts["channel.operation_voltage_0_5"], held)
 
 
 class Numbers(Bench):

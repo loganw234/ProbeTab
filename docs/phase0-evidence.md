@@ -140,6 +140,7 @@ finding.
 | `command.separator` | - | bears on | commands with parameters are sent, and answered; no run changes the character, so only "accepted" is shown |
 | `collection.sample_time_default` | - | bears on | the Command 7 reply after the reset holds the last run's sample time. Missing: a fact giving that value's place in the reply, which the facts file lacks, and that a reset leaves it at the default. Step 1's reply holds the same value before the reset, but cannot tell a default from one an earlier run set |
 | `channel.ch1` | - | bears on | Commands 1 and 9 name channel 1 and draw a value, and the trace's note holds the voltage applied at the port labelled CH1 as the owner typed it (`--applied`, bench.py:571-572), and a meter's reading if one was given (:573-574). Missing: any measurement of that voltage by the unit's side. The note is the owner's record, not the LabPro's, and a typo in it is not caught |
+| `channel.numbers_analog` | - | bears on | step 3's Command 1 sends `channel.ch1`, a number this row holds, in the channel's place as page 31 writes it, and the next Command 7's error register shows whether the unit takes it (bench.py:424, :426). Missing: the row's other numbers, which no step sends |
 | `channel.operation_auto_id` | - | bears on | the operation is sent and the next status shows no error (bench.py:424-426); missing: any sign that the unit identified a sensor |
 | `channel.operation_voltage_0_5` | - | bears on | the operation is sent in step 3's two further runs, once in each order of Command 1's parameters (`--operation voltage`, with and without `--order operation-first`; bench.py:421-424), and the next status's error register is read after each (:426). Missing: a reading of a unit that takes both orders, or neither, which leaves the order open; the unit may also refuse the operation on CH1 for another reason. It is BELIEVED that exactly one order draws an error. Depends on Q5 |
 | `channel_data.mode_retest` | - | bears on | an `OUT` line for Command 9 in the retest mode, and one value (bench.py:427); step 4 and step 5 repeat it. Missing: a sensor changed between the two modes |
@@ -175,6 +176,10 @@ notes.
 |---|---|---|---|
 | `ports.analog` | - | not reached | the count of sockets, seen by eye; no trace records it |
 | `ports.digital` | - | not reached | seen by eye; no step uses a digital port |
+| `channel.numbers_all` | - | not reached | no step sends this row's number |
+| `channel.numbers_sonic` | - | not reached | no step sends a number from this row; no step uses a sonic port |
+| `channel.numbers_digital_in` | - | not reached | no step sends a number from this row; no step uses a digital port |
+| `channel.numbers_digital_out` | - | not reached | no step sends a number from this row; no step uses a digital port |
 | `adc.bits` | - | not reached | no step reads the converter's raw word; Command 9's value is text, and what it means is Q4 |
 | `buffer.points` | - | not reached | no collection is run |
 | `realtime.usb_max_rate` | - | not reached | no real-time collection is run (Q6) |

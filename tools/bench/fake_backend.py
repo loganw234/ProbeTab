@@ -23,7 +23,7 @@ says the script agrees with that model, not with a LabPro. A recording from
 the bench can be replayed the same way.
 
 One thing it can do beyond replaying, when asked to with command_1_errors: set
-the error register. See CHANNELS and FakeLabPro.error. That is the lead's model
+the error register. See CHANNEL_ROWS and FakeLabPro.error. That is the lead's model
 of a LabPro, BELIEVED and not measured, so it is off unless a test asks, and a
 replay of a recording never has a reply rewritten.
 
@@ -41,13 +41,24 @@ import usb.util
 IN_ADDRESS = 0x82   # invented: a LabPro's addresses are for the bench to show
 OUT_ADDRESS = 0x01  # invented, and numbered apart from IN_ADDRESS on purpose
 # BELIEVED, the lead's model and not a measurement: a unit that is told to set up a channel
-# page 31's list does not hold sets its error register (page 45 says it is non-zero after a
-# fault) and keeps it until Command 0 clears the error state (page 30). Page 31 lists the
-# channels 0, 1 to 4, 11 and 12, 21 and 22, and 31 and 32. Typed here, not in the facts
-# file, because it is part of the model and not a fact the script may rely on. The code the
-# fake sets is invented: the manual's pages give none for this fault.
-CHANNELS = frozenset({0, 1, 2, 3, 4, 11, 12, 21, 22, 31, 32})
+# no row of page 31's table holds sets its error register (page 45 says it is non-zero after a
+# fault) and keeps it until Command 0 clears the error state (page 30). The channels come from
+# the facts, one fact for each row of that table, named here. The code the fake sets is
+# invented: the manual's pages give none for this fault.
+CHANNEL_ROWS = ("channel.numbers_all", "channel.numbers_analog", "channel.numbers_sonic",
+                "channel.numbers_digital_in", "channel.numbers_digital_out")
 ERROR_CODE = 1
+
+
+def channels(facts, rows=CHANNEL_ROWS):
+    """The channel numbers the named facts give. Each value is one number, two joined by a
+    comma, or a first and a last joined by " - ", as the facts file's comment on them says."""
+    found = set()
+    for name in rows:
+        for part in str(facts[name]).split(","):
+            first, _, last = part.strip().partition(" - ")
+            found.update(range(int(first), int(last or first) + 1))
+    return frozenset(found)
 
 
 class Mismatch(AssertionError):
@@ -73,7 +84,7 @@ class FakeLabPro(usb.backend.IBackend):
                  take=None, write_timeout=False, read_error=None, unsupported=None,
                  manufacturer=None, product=None, serial=None, short_device=False, short_configuration=False,
                  bad_total=False, interrupt_at=None, interruption=KeyboardInterrupt, command_1_errors=False):
-        self.command_1_errors = command_1_errors  # model the error register, as the comment on CHANNELS says
+        self.command_1_errors = command_1_errors  # model the error register, as the comment on CHANNEL_ROWS says
         self.error = 0                      # the error register the model holds
         self.short_configuration = short_configuration  # the configuration's first, 9-byte read gives 8
         self.bad_total = bad_total          # the configuration's total length says one byte more than it holds
@@ -89,6 +100,7 @@ class FakeLabPro(usb.backend.IBackend):
         self.descriptors_asked = []         # (type, index, length) for every GET_DESCRIPTOR
         self.transfers = list(trace.transfers)
         self.facts = facts
+        self.channels = channels(facts) if command_1_errors else None  # read only for the model
         self.name = name
         self.devices = list(range(devices))
         size = facts["usb.packet_size"] if packet_size is None else packet_size
@@ -250,7 +262,7 @@ class FakeLabPro(usb.backend.IBackend):
         return len(sent) if self.take is None else min(self.take, len(sent))
 
     def model_error(self, sent):
-        """Keeps the error register of the model on CHANNELS, and puts it into the reply to Command 7
+        """Keeps the error register of the model on CHANNEL_ROWS, and puts it into the reply to Command 7
         that the trace holds next, in place of the register the trace holds there."""
         facts = self.facts
         text = sent.decode("ascii", "replace")
@@ -263,7 +275,7 @@ class FakeLabPro(usb.backend.IBackend):
             return
         if numbers[0] == facts["command.reset"]:
             self.error = 0
-        elif numbers[0] == facts["command.channel_setup"] and len(numbers) > 1 and numbers[1] not in CHANNELS:
+        elif numbers[0] == facts["command.channel_setup"] and len(numbers) > 1 and numbers[1] not in self.channels:
             self.error = ERROR_CODE
         elif numbers[0] == facts["command.request_system_status"] and self.error:
             self.place_error()

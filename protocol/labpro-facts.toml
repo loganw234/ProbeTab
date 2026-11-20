@@ -563,6 +563,47 @@ evidence = "Analog channels 1 through 4"
 status = "manual"
 note = "The port labelled CH1 (page 6) is channel number 1."
 
+# Command 1's channel numbers: one fact for each row of page 31's table. A value
+# is the row's numbers: one number, two joined by a comma, or a first and a last
+# joined by " - ", as the rate facts write their channels.
+# tools/bench/fake_backend.py builds its model of a channel Command 1 takes from them.
+
+[channel.numbers_all]
+value = "0"
+source = "trm"
+page = 31
+evidence = "Channel number Description 0 All channels"
+status = "manual"
+note = "Page 31 gives this number for all the channels together."
+
+[channel.numbers_analog]
+value = "1 - 4"
+source = "trm"
+page = 31
+evidence = "Analog channels 1 through 4"
+status = "manual"
+
+[channel.numbers_sonic]
+value = "11, 12"
+source = "trm"
+page = 31
+evidence = "11, 12 Sonic Channel 1, Sonic Channel 2"
+status = "manual"
+
+[channel.numbers_digital_in]
+value = "21, 22"
+source = "trm"
+page = 31
+evidence = "21, 22 Digital Input 1, Digital Input 2"
+status = "manual"
+
+[channel.numbers_digital_out]
+value = "31, 32"
+source = "trm"
+page = 31
+evidence = "31, 32 Digital Output 1, Digital Output 2"
+status = "manual"
+
 [channel.operation_auto_id]
 value = 1
 source = "trm"
