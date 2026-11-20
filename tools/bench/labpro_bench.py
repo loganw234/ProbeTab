@@ -3,6 +3,8 @@
 
     python tools/bench/labpro_bench.py --out PATH [--form FORM] [--timeout-ms N] [--libusb LIB]
                                        [--descriptors] [--read-ch1 [--discard]
+                                       [--operation OPERATION] [--order ORDER]
+                                       [--applied VOLTS] [--meter VOLTS]
                                        [--every SECONDS [--readings N] [--for SECONDS]]]
 
 By default it finds the one USB device with the LabPro's vendor and product IDs
@@ -24,12 +26,23 @@ tools/traces.py says: model information only.
         busy unit is never reset.
     Command 0, the reset; the script listens briefly for anything after it.
     Command 7, which must show idle with no data unretrieved.
-    Command 1, channel 1 by auto-ID; the script listens briefly again.
+    Command 1, channel 1 by auto-ID unless --operation says otherwise, the
+        channel first unless --order says otherwise; the script listens briefly
+        again.
     Command 7, whose error register must be 0.
     Command 9 for channel 1 in mode 0, the present setup: one value.
     Command 7, whose error register must be 0.
     Command 9 in mode 1, once, as an experiment: the stored setup's value.
     Command 7, whose error register must be 0.
+--operation is auto-id (the default) or voltage, the 0 to 5 V operation. --order
+is channel-first (the default, as page 31 writes Command 1) or operation-first.
+Both only change what Command 1 sends: the unit's answer is for the bench.
+--applied and --meter are the voltage set on the supply and, if a meter is used,
+the meter's reading, each a plain number of volts: an optional minus sign, digits,
+and optionally a point and more digits, at most NUMBER_LENGTH characters. They are
+the operator's record, not the LabPro's, and are written into the trace's note
+exactly as typed. All four options are refused without --read-ch1, and a number
+that does not fit is refused before any device is opened.
 --every then reads Command 9 in mode 0 at that interval, of at most
 MAX_EVERY seconds, until --readings readings or --for seconds, with Command 7
 checked every ERROR_EVERY readings.
@@ -39,6 +52,12 @@ script's behalf: they read its descriptors and which configuration is active,
 and when that read fails, the script has pyusb set the first configuration.
 These are not LabPro commands, and a trace holds bulk transfers only, so its
 note says when the script set the configuration.
+
+After its first Command 7, every run prints one line for the unit's state:
+its name, and whether the QuickSetup flag and the unretrieved-data flag are
+set (page 45). The runbook's later steps go on only by that line. A system
+state that is no state the facts give is printed as such, and a run without
+--read-ch1 goes on; with --read-ch1 the guard refuses it.
 
 Every value about the LabPro comes from protocol/labpro-facts.toml, read
 through tools/labpro_facts.py, and each refusal names the fact it rests on.
@@ -100,6 +119,11 @@ STATES = ("status.state_idle", "status.state_armed", "status.state_busy", "statu
           "status.state_self_test", "status.state_initializing")
 RESETTABLE = ("status.state_idle", "status.state_done")
 WAITING = ("status.state_initializing", "status.state_self_test")
+# What --operation and --order choose between: each operation is a fact's name, never its number.
+OPERATIONS = {"auto-id": "channel.operation_auto_id", "voltage": "channel.operation_voltage_0_5"}
+ORDERS = ("channel-first", "operation-first")
+NUMBER = re.compile(r"-?[0-9]+(?:\.[0-9]+)?")  # --applied and --meter: ASCII digits only, no sign but minus
+NUMBER_LENGTH = 12
 
 
 class Refused(Exception):
@@ -362,7 +386,14 @@ def label(name):
     return name.removeprefix("status.state_").replace("_", "-")
 
 
-def read_ch1(session, first, discard, every, readings, seconds, say):
+def state_line(state):
+    """The one line that names a decoded state and says whether each flag is set."""
+    name, quick, unretrieved = state
+    return (f"state: {label(name)}; QuickSetup flag {'set' if quick else 'clear'}; "
+            f"unretrieved-data flag {'set' if unretrieved else 'clear'}")
+
+
+def read_ch1(session, first, discard, every, readings, seconds, say, operation="auto-id", order="channel-first"):
     """Reads CH1, as the docstring gives the steps, after the status first. Refused at any step it
     does not recognise."""
     facts = session.facts
@@ -387,7 +418,10 @@ def read_ch1(session, first, discard, every, readings, seconds, say):
     if state is None or state[0] != "status.state_idle" or state[2]:
         seen = "no reply" if state is None else label(state[0]) + (" with data unretrieved" if state[2] else "")
         raise Refused(f"after the reset the unit is not idle: {seen} ({facts.cite('status.state_idle')})")
-    session.send(facts["command.channel_setup"], facts["channel.ch1"], facts["channel.operation_auto_id"])
+    parameters = [facts["channel.ch1"], facts[OPERATIONS[operation]]]
+    if order == "operation-first":
+        parameters.reverse()
+    session.send(facts["command.channel_setup"], *parameters)
     session.quiet("Command 1", f"page 32 says returns nothing ({facts.cite('command.channel_setup_reply')})")
     session.no_errors("Command 1")
     present = session.channel_value(facts["channel_data.mode_retest"])
@@ -491,8 +525,15 @@ def phase0(facts, args, backend, say, run):
         say("the reply's values, in order (protocol/REFERENCE.md names them):")
         for place, value in enumerate(values, start=1):
             say(f"  {place:>2}  {value}")
+        try:
+            say(state_line(decode_state(values, facts)))
+        except Refused as why:
+            if args.read_ch1:
+                raise  # the guard refuses it, as it always did
+            say(f"state: {why}; the run goes on")
         if args.read_ch1:
-            read_ch1(session, values, args.discard, args.every, args.readings, getattr(args, "for"), say)
+            read_ch1(session, values, args.discard, args.every, args.readings, getattr(args, "for"), say,
+                     args.operation, args.order)
     except Refused as why:
         run.refusal = str(why)
     except usb.core.USBError as exc:
@@ -523,10 +564,14 @@ def check_out(path, root, backend):
     return out
 
 
-def write_trace(out, began, run, form):
+def write_trace(out, began, run, form, applied=None, meter=None):
     note = f"Command 7 framed as {form}"
     if run.configured_here:
         note += "; pyusb could not read the active configuration, so the script set the device's first before it"
+    if applied is not None:
+        note += f"; applied {applied} V"
+    if meter is not None:
+        note += f"; meter {meter} V"
     header = {"date": began.isoformat(timespec="seconds"), "os": os_name(), "stack": run.stack,
               "firmware": run.firmware, "note": note, **run.descriptors}
     data = traces.write("trace", header, run.transfers).encode("utf-8")
@@ -574,6 +619,15 @@ def reading_count(text):
     return value
 
 
+def volts(text):
+    """--applied's and --meter's number: an optional minus sign, digits, and optionally a point and more
+    digits, at most NUMBER_LENGTH characters. It is kept as typed."""
+    if len(text) > NUMBER_LENGTH or not NUMBER.fullmatch(text):
+        raise argparse.ArgumentTypeError(f"{text!r} is not a plain number of volts: an optional minus sign, digits, "
+                                         f"and optionally a point and more digits, at most {NUMBER_LENGTH} characters")
+    return text
+
+
 def main(argv=None, backend=None, stdout=None, root=ROOT):
     """Run Phase 0's steps; backend and root are for tests, which pass the fake and a scratch folder."""
     stdout = stdout or sys.stdout
@@ -589,12 +643,22 @@ def main(argv=None, backend=None, stdout=None, root=ROOT):
     parser.add_argument("--descriptors", action="store_true", help="record the device's descriptors and strings")
     parser.add_argument("--read-ch1", action="store_true", help="go on to reset, set up and read CH1")
     parser.add_argument("--discard", action="store_true", help="reset even when data is not yet retrieved")
+    parser.add_argument("--operation", choices=tuple(OPERATIONS),
+                        help="Command 1's operation: auto-id (default) or voltage, the 0 to 5 V operation")
+    parser.add_argument("--order", choices=ORDERS,
+                        help="Command 1's order of channel and operation: channel-first (default) or operation-first")
+    parser.add_argument("--applied", type=volts, metavar="VOLTS", help="the voltage set on the supply, for the trace's note")
+    parser.add_argument("--meter", type=volts, metavar="VOLTS", help="a meter's reading, for the trace's note")
     parser.add_argument("--every", type=interval, metavar="SECONDS", help="then read CH1 at this interval")
     parser.add_argument("--readings", type=reading_count, metavar="N", help="with --every, stop after N readings")
     parser.add_argument("--for", type=duration, metavar="SECONDS", help="with --every, stop after this long")
     args = parser.parse_args(argv)
     if (args.discard or args.every is not None) and not args.read_ch1:
         parser.error("--discard and --every go with --read-ch1")
+    for option in ("operation", "order", "applied", "meter"):
+        if getattr(args, option) is not None and not args.read_ch1:
+            parser.error(f"--{option} goes with --read-ch1")
+    args.operation, args.order = args.operation or "auto-id", args.order or "channel-first"
     if args.every is not None and args.readings is None and getattr(args, "for") is None:
         parser.error("--every needs --readings or --for, so that it ends")
     if (args.readings is not None or getattr(args, "for") is not None) and args.every is None:
@@ -621,7 +685,7 @@ def main(argv=None, backend=None, stdout=None, root=ROOT):
         # Whatever ends the run, the transfers made so far are written. An error the script does not
         # name then goes on, with its traceback.
         if run.transfers:
-            digest = write_trace(out, began, run, args.form)
+            digest = write_trace(out, began, run, args.form, args.applied, args.meter)
             say(f"wrote {len(run.transfers)} transfers to {args.out}")
             say(f"its SHA-256 is {digest}")
         else:

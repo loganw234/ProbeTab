@@ -13,6 +13,10 @@ The bench script for Phase 0 with a LabPro, and its tests.
 - [fake_backend.py](fake_backend.py) is a pyusb backend that stands in for a
   LabPro by replaying a trace: a fixture now, and a recording once there is
   one. It also answers requests for the device's descriptors.
+  - **When a test asks,** it also models one fault: Command 1 for a channel
+    that page 31's list does not hold sets the error register, until Command 0.
+    That is the lead's model, BELIEVED and not measured. It is off otherwise,
+    so a replayed recording is never rewritten.
 - [test_bench.py](test_bench.py) and [test_ch1.py](test_ch1.py) run the script
   against the fake. The gate's `bench` check runs them.
 - **The browser bench page's Python side:**
@@ -75,7 +79,8 @@ Then, to read CH1:
    - An armed or busy unit is never reset, `--discard` or not.
 2. **The reset** (Command 0), and a brief listen for anything after it.
 3. **Command 7,** which must show idle.
-4. **Channel 1 by auto-ID** (Command 1), and a brief listen.
+4. **Channel 1** (Command 1), by auto-ID with the channel first unless
+   `--operation` and `--order` say otherwise, and a brief listen.
 5. **Command 7,** whose error register must be 0.
 6. **One reading:** Command 9 in mode 0, the present setup, then Command 7.
 7. **The experiment:** Command 9 in mode 1, the stored setup, once, then
@@ -99,6 +104,27 @@ with Command 7 checked every tenth reading.
   the device's strings, in the trace's header. The serial number keeps only its
   first 3 and last 2 characters: model information only, by the owner's ruling
   of 2026-11-16.
+- **`--operation auto-id|voltage`** chooses Command 1's operation, from the
+  facts file: `auto-id` (the default) or `voltage`, the 0 to 5 V operation.
+- **`--order channel-first|operation-first`** chooses the order of Command 1's
+  two parameters. Channel first is the default, as page 31 writes it. With
+  auto-ID the two orders send the same bytes, since the facts give the channel
+  and auto-ID the same number; so the order shows only with `--operation
+  voltage`. Which order a unit takes is for the bench (Q5).
+- **`--applied VOLTS` and `--meter VOLTS`** record the voltage set on the supply,
+  and a meter's reading if there is one, in the trace's `note`, after the text
+  the script writes there, exactly as typed. Each is an optional minus sign,
+  digits, and optionally a point and more digits, at most 12 characters: `1.25`
+  and `-0.5` pass, and `1e3`, `.5` and `1,5` do not. They are the operator's
+  record, not the LabPro's. For a negative number, write it with an equals sign,
+  as `--applied=-0.5`.
+- **The four options above go only with `--read-ch1`,** and are refused
+  without it. A number that does not fit is refused before any device is opened.
+- **The state line.** After its first Command 7, every run prints one line,
+  such as `state: idle; QuickSetup flag clear; unretrieved-data flag clear`
+  (page 45). The runbook's steps 2 and 6 go on only by it. Without `--read-ch1`,
+  a system state no fact gives is printed as such and the run goes on; with it,
+  the guard refuses that state as before.
 
 **What it reports.** The script prints what it found, each reply's values, and
 CH1's readings, then where the trace went and its SHA-256.
