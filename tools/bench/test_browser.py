@@ -222,9 +222,10 @@ class Converter(unittest.TestCase):
 class Server(unittest.TestCase):
     def setUp(self):
         self.app = Path(tempfile.mkdtemp(prefix="probetab-serve-"))
-        # Beside the two served folders lie files with types the server does serve, so that only the
+        # Beside the three served folders lie files with types the server does serve, so that only the
         # check of the folders can refuse them.
-        for name, data in (("bench/index.html", b"<!doctype html>"), ("web/bench/page.js", b"export {};"),
+        for name, data in (("bench/index.html", b"<!doctype html>"), ("collect/index.html", b"<!doctype html>"),
+                           ("collect/data.json", b"secret"), ("web/bench/page.js", b"export {};"),
                            ("web/bench/page.ts", b"export {};"), ("web/bench/data.json", b"secret"), ("web/sub/note.js", b""),
                            ("package.json", b"{}"), ("secret.js", b"secret"), ("src/bench/page.js", b"secret"),
                            ("node_modules/typescript/lib/tsc.js", b"secret"), ("secret/index.html", b"secret")):
@@ -276,6 +277,7 @@ class Server(unittest.TestCase):
 
     def test_the_page_and_its_modules_are_served_with_their_types(self):
         for path, kind in (("/bench/", "text/html; charset=utf-8"), ("/bench/index.html", "text/html; charset=utf-8"),
+                           ("/collect/", "text/html; charset=utf-8"), ("/collect/index.html", "text/html; charset=utf-8"),
                            ("/web/bench/page.js", "text/javascript; charset=utf-8")):
             with self.subTest(path=path):
                 status, content_type, _ = self.get(path)
@@ -283,7 +285,8 @@ class Server(unittest.TestCase):
 
     def test_anything_else_is_refused(self):
         for path in ("/package.json", "/secret.js", "/src/bench/page.js", "/node_modules/typescript/lib/tsc.js",
-                     "/secret/", "/bench/../secret.js", "/bench/%2e%2e/secret.js", "/web/..%2fsecret.js",
+                     "/secret/", "/bench/../secret.js", "/bench/%2e%2e/secret.js", "/collect/../secret.js", "/collect/data.json",
+                     "/web/..%2fsecret.js",
                      "/web/bench/page.ts", "/web/bench/data.json", "/web/", "/web/sub/", "/", "/missing.js"):
             with self.subTest(path=path):
                 status, _, body = self.get(path)

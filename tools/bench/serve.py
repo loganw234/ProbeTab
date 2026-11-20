@@ -3,17 +3,17 @@
 
     python tools/bench/serve.py [--port N]
 
-It serves two folders of app/ and nothing else: bench/, the bench page and its
-rehearsal (rehearse.html), and web/,
+It serves three folders of app/ and nothing else: bench/, the bench page and its
+rehearsal (rehearse.html), collect/, the classroom screen, and web/,
 the JavaScript that tsc builds from app/src/ (app/README.md says how to build
 it). It binds to 127.0.0.1, so no other computer can reach it. Open
-http://127.0.0.1:N/bench/ in Chrome or Edge: WebUSB needs a secure origin, and
+http://127.0.0.1:N/bench/ (or /collect/) in Chrome or Edge: WebUSB needs a secure origin, and
 Chromium counts 127.0.0.1 as one (BELIEVED, from Chromium's behaviour; Phase 0
 shows it).
 
 Each file's type comes from its extension, by this script's own table, never
 the system's: Windows' registry can make .js plain text (BELIEVED), and a
-browser will not run a module served as text. A path outside the two folders,
+browser will not run a module served as text. A path outside the three folders,
 a folder without an index.html, or an extension not in the table is answered
 404. Ctrl-C stops it.
 
@@ -27,7 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 ADDRESS = "127.0.0.1"
-SERVED = ("bench", "web")
+SERVED = ("bench", "collect", "web")
 TYPES = {
     ".html": "text/html; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
@@ -37,7 +37,7 @@ TYPES = {
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
-    """Serves the two folders under its directory, each file by TYPES."""
+    """Serves the three folders under its directory, each file by TYPES."""
 
     quiet = False  # the tests set it, so that their output holds only their results
 
@@ -68,7 +68,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 
 def make_server(app, port, address=ADDRESS):
-    """A server for app's two folders on address and port, not yet serving. Only the tests
+    """A server for app's three folders on address and port, not yet serving. Only the tests
     name an address, and they name 127.0.0.1."""
     return http.server.ThreadingHTTPServer((address, port), partial(Handler, directory=str(app)))
 
@@ -86,8 +86,8 @@ def main(argv=None):
     host, port = server.server_address[:2]
     if not (app / "web" / "bench" / "page.js").is_file():
         print("app/web/ holds no build of the page yet; app/README.md says how to build it")
-    print(f"serving app/bench/ and app/web/ to this computer alone: open http://{host}:{port}/bench/ "
-          f"in Chrome or Edge; Ctrl-C stops it")
+    print(f"serving app/bench/, app/collect/ and app/web/ to this computer alone: open http://{host}:{port}/bench/ "
+          f"or /collect/ in Chrome or Edge; Ctrl-C stops it")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

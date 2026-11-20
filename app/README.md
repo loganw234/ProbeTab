@@ -13,7 +13,7 @@ syntax only, so no enums, namespaces or parameter properties, and imports that
 name their `.ts` files. The tests run the `.ts` files as they are. The bench
 page runs a build of them, which tsc makes (see [The bench page](#the-bench-page)).
 
-## What is here (2026-11-18)
+## What is here (2026-11-19)
 
 - [src/transport/transport.ts](src/transport/transport.ts): the transport
   interface. A transport opens, closes, writes bytes, and reads the next bytes
@@ -68,13 +68,48 @@ page runs a build of them, which tsc makes (see [The bench page](#the-bench-page
   those it misses), that its table is that formula, and that it says it is a
   mockup. It has not been tried with a screen reader or on a
   Chromebook.
+- [collect/index.html](collect/index.html) is the classroom screen, first
+  piece: the mockup's look made to work, with **practice readings only**. Every
+  reading on it is made up, and it says so in several places, in its file and
+  in a kept run it restores. No LabPro is connected by it, and nothing in it is
+  evidence about one. Its code is in [src/collect/](src/collect/), and it loads
+  its built modules from `web/collect/`:
+  - [practice.ts](src/collect/practice.ts) is the practice source, from the
+    mockup's formula;
+  - [collector.ts](src/collect/collector.ts) is the run's four states and what
+    each button does to it, with its clock, storage and questions handed in;
+  - [history.ts](src/collect/history.ts) keeps the last run, and the °F choice,
+    in `localStorage` (below);
+  - [csv.ts](src/collect/csv.ts), [units.ts](src/collect/units.ts),
+    [graph.ts](src/collect/graph.ts), [view.ts](src/collect/view.ts) and
+    [words.ts](src/collect/words.ts) make the spreadsheet file, convert °C to
+    °F, draw the graph as an SVG string, work out what the page shows, and hold
+    its words;
+  - [page.ts](src/collect/page.ts) is the thin glue to the page. Node does not
+    test it.
+  - **History** is the last run only, saved after every reading under
+    `probetab.collect.lastRun.v1`. A run comes back marked "stopped when the
+    page closed" if the tab closed mid-run. Start, Collect another run and
+    Clear each ask before discarding it, every time. Readings are kept in
+    Celsius as the source gave them, whatever the °F toggle says. Storage that
+    is missing or full is told to the person in a line; the page works without
+    it. Two tabs open at once share the one run and can overwrite each other's
+    (a stated limit). Thirty minutes at one reading a second is about 59,000
+    characters of JSON (MEASURED, [collect-history.test.ts](test/collect-history.test.ts)).
+  - The page is not published: `pages.yml` does not copy `collect/`, which is
+    the owner's call. `python tools/bench/serve.py` serves it at `/collect/`.
+  - Its tests are `test/collect-*.test.ts`, with
+    [collect-fakes.ts](test/collect-fakes.ts) (a storage, a failing storage and
+    a clock driven by hand). `collect-page.test.ts` imports the mockup test's
+    finder of references to other sites, so the mockup's tests run in its
+    process too.
 
 ## Running the tests
 
 The tests need only Node with type stripping, which Node 22.19 has by default.
 From the repository's root:
 
-    node --test app/test/memory.test.ts app/test/status.test.ts app/test/webusb.test.ts app/test/bench.test.ts app/test/rehearsal.test.ts
+    node --test app/test/memory.test.ts app/test/status.test.ts app/test/webusb.test.ts app/test/bench.test.ts app/test/rehearsal.test.ts app/test/collect-data.test.ts app/test/collect-history.test.ts app/test/collect-run.test.ts app/test/collect-view.test.ts app/test/collect-page.test.ts
 
 The gate's `app` check runs each `app/test/*.test.ts` alone, in a node process
 of its own, and requires node's summary from each. A file that holds no tests,
