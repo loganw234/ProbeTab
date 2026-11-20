@@ -142,7 +142,8 @@ to write.
 The bench page takes the same steps in Chrome or Edge, over WebUSB.
 [app/README.md](../../app/README.md) says how to build it and use it.
 
-- **`serve.py`** serves `app/bench/` and `app/web/`, and nothing else.
+- **`serve.py`** serves `app/bench/`, `app/collect/` and `app/web/`, and
+  nothing else.
   - It binds to 127.0.0.1, so no other computer can reach it.
   - `--port` chooses the port, 8000 by default.
   - Each file's type comes from the script's own table, so `.js` is served as
