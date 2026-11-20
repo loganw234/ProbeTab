@@ -38,8 +38,9 @@ Rules for placing a row:
   not.
 - **Step 2 has two cases.** In case A, `s-cr` drew no reply, and the other
   framings are tried until one answers. In case B, `s-cr` was answered, and the
-  other three are run only if step 1's state line reads idle or done with no
-  data unretrieved. Every row that reads a reply holds only once some framing
+  other three are run only if step 1's state line passes the data check of
+  phase0.md step 1: the state is idle or done, and the unretrieved-data flag is
+  clear. Every row that reads a reply holds only once some framing
   is answered. Where step 2 supplies that reply, read its trace in place of
   step 1's.
 - **"Settles" is for a step's designed path.** Run as written, every answer the
@@ -91,7 +92,7 @@ Each row: key, channels, word, then what in the trace shows it and where the cod
 
 | Fact | Channels | Word | What the trace holds, and the code |
 |---|---|---|---|
-| `usb.vendor_id` | - | settles | `device` header line, the vendor field (bytes 8-9, low byte first); bench.py:279, header at :530 |
+| `usb.vendor_id` | - | settles | `device` header line, the vendor field (bytes 8-9, low byte first); bench.py:279, header at :575 |
 | `usb.product_id` | - | settles | `device` header line, the product field (bytes 10-11, low byte first); bench.py:279 |
 | `usb.bulk_in_endpoints` | - | settles | `configuration` header line: the bulk endpoint descriptors with the direction bit set; bench.py:284 |
 | `usb.bulk_out_endpoints` | - | settles | same line, the bulk descriptors with the direction bit clear; bench.py:284 |
@@ -211,7 +212,7 @@ From [protocol/REFERENCE.md](../protocol/REFERENCE.md), "What Phase 0 has to set
 
 | Question | Word | Step | What the traces hold, and what is missing |
 |---|---|---|---|
-| Q1 | settles | 1, 2 | step 1 sends `s-cr` only, and an answer shows it works, not that each part is needed. Step 2's case B runs the other three framings, only while step 1's state line reads idle or done with no data unretrieved, and its four traces show which parts are needed. Case A, after a silent step 1, stops at the first answer. A skipped case B leaves Q1 as step 1 does |
+| Q1 | settles | 1, 2 | step 1 sends `s-cr` only, and an answer shows it works, not that each part is needed. Step 2's case B runs the other three framings, only while step 1's state line passes the data check (the state is idle or done, and the unretrieved-data flag is clear), and its four traces show which parts are needed. Case A, after a silent step 1, stops at the first answer. A skipped case B leaves Q1 as step 1 does |
 | Q2 | bears on | 1 | the bytes and how they sit in packets are settled (`IN` lines, bench.py:309). The unit's software ID rests on `status.software_id_position`, which is bears on |
 | Q3 | not reached | - | no step sends the binary-mode command or collects data |
 | Q4 | bears on | 3 | the value's text is in each `IN` line, and the voltage applied is in the trace's note as the owner typed it (bench.py:571-574), beside the meter's reading if there was one. That is the owner's record, not the LabPro's, and whether the value is in the sensor's units or a raw voltage needs a spread of known voltages |
@@ -233,7 +234,8 @@ this map lacked.
    Neither settles unless exactly one order draws an error.
 2. **Q1, `command.prefix`, `command.serial_terminator`: adopted, with a
    guard.** After step 1 is answered, each other framing is run once, **only
-   while step 1's state line reads idle or done with no data unretrieved**,
+   while step 1's state line passes the data check (the state is idle or
+   done, and the unretrieved-data flag is clear)**,
    since a power-cycle after a silent framing clears held data (page 26), and a
    unit that arrived armed or busy would lose its run. The three rows moved to
    Step 2, and Q1 to settles, on that path.
@@ -243,8 +245,9 @@ this map lacked.
    shorter list of what is missing.
 4. **`status.system_state_position`, `status.quicksetup_flag`,
    `status.state_idle`: adopted, as an optional last step 6, with a guard.**
-   The press goes ahead only if step 1's state line reads idle or done with no
-   data unretrieved and the reply shows no error, since page 26 says a press
+   The press goes ahead only if step 6's first trace passes the data check (the
+   state is idle or done, and the unretrieved-data flag is clear) and its reply
+   shows no error, since page 26 says a press
    wipes the unit's stored data and its setup. The step ends with a power-cycle. The
    three facts stay at bears on, under Step 1: a press that does not set the
    flag shows nothing about it.

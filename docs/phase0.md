@@ -101,11 +101,18 @@ Name each trace for its step and its date, such as
    `differs from the manual` or `refused`.
 5. **Read the state line.** After the reply's values, the script prints one
    line, such as `state: idle; QuickSetup flag clear; unretrieved-data flag
-   clear` (page 45). Write it down. **Steps 2 and 6 go on only by this line,**
-   and only when it reads `idle` or `done` with `unretrieved-data flag clear`:
-   a power-cycle or a Quick Setup press loses data the unit holds (page 26),
-   and the script never resets an armed or busy unit. A system state the facts
-   do not give is printed as that, and the run is not refused for it.
+   clear` (page 45). Write it down. **The data check.** A power-cycle or a Quick
+   Setup press loses data the unit holds (page 26), and the script never resets
+   an armed or busy unit. So a state line passes the data check only when
+   **both** parts hold:
+   - **(a)** the state is `idle` or `done`;
+   - **(b)** the line says `unretrieved-data flag clear`.
+
+   If either fails, the line fails the check: an `idle` line that says
+   `unretrieved-data flag set` fails it. **Step 2 goes on only by this line,
+   passing the check,** and step 6 applies the same check to its own first
+   trace. A system state the facts do not give is printed as that, and the run
+   is not refused for it.
 
 ### 2. Command 7 in the other framings
 
@@ -121,8 +128,9 @@ stop at the first one that is answered:
 
 **B. `s-cr` was answered.** That shows the `s` and the carriage return are
 accepted, not that each is needed. Run each of the other three once, in the
-same commands as above, **only if** step 1's state line read `idle` or `done`
-with `unretrieved-data flag clear`. Otherwise skip case B: the power-cycle it
+same commands as above, **only if** step 1's state line passes the data check
+(step 1, item 5): the state is `idle` or `done`, **and** the unretrieved-data
+flag is `clear`. Otherwise skip case B: the power-cycle it
 may need would lose the unit's run or its data.
 
 Each run writes its own trace, even one that drew nothing.
@@ -131,8 +139,9 @@ Each run writes its own trace, even one that drew nothing.
 command in the unit, so power-cycle the LabPro after it, as the safety section
 says. In case B, that includes the last framing, before step 3.
 - **Before each power-cycle,** look at the latest state line you have, from
-  step 1 or from a framing that was answered. If it does not read `idle` or
-  `done` with `unretrieved-data flag clear`, stop. A power-cycle would lose
+  step 1 or from a framing that was answered. If it fails the data check, so
+  that the state is not `idle` or `done`, **or** the unretrieved-data flag is
+  `set`, stop. A power-cycle would lose
   that data, so you decide then whether it matters.
 - **In case A, while no reply has given a state line,** there is none to look
   at: power-cycle before the next framing, as before.
@@ -236,8 +245,9 @@ wrong.
 
        .venv/bin/python tools/bench/labpro_bench.py --out 2026-11-20-qs-before.trace --form FRAMING
 
-   **Go on only if** its state line reads `idle` or `done` with
-   `unretrieved-data flag clear`, and the reply's error register reads zero
+   **Go on only if** this trace's own state line passes the data check (step 1,
+   item 5): the state is `idle` or `done`, **and** the unretrieved-data flag is
+   `clear`; and the reply's error register reads zero
    ([protocol/REFERENCE.md](../protocol/REFERENCE.md) says which value it is).
    **Otherwise stop, and do not press Quick Setup.** If the QuickSetup flag
    already reads set, a press cannot show it appear; go on only if you still
@@ -249,7 +259,9 @@ wrong.
 
        .venv/bin/python tools/bench/labpro_bench.py --out 2026-11-20-qs-after.trace --form FRAMING
 
-   If it draws no reply, stop there and keep both traces.
+   If it draws no reply, stop there and keep both traces, and still do item 4.
+   That is safe: item 1's check passed before the press, and the press itself
+   wipes the unit's stored data (page 26).
 4. **Power-cycle the LabPro,** to leave it in a known state, as the safety
    section says.
 
