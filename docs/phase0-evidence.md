@@ -45,7 +45,8 @@ screen, which is not evidence.
 ## What each step's trace is for
 
 1. **Power up, then first contact.** The unit's own description of itself (the
-   descriptor lines, from `--descriptors`) and one Command 7 reply. Most of the
+   descriptor lines, from `--descriptors`) and one Command 7 reply, which also
+   shows the state the unit arrived in. Most of the
    settled facts are here.
 2. **Command 7 in each framing.** Which framing a unit answers, by comparing
    what was sent with whether anything came back. It runs only if step 1 is
@@ -73,7 +74,7 @@ Each row: key, channels, word, then what in the trace shows it and where the cod
 | `usb.bulk_out_endpoints` | - | settles | same line, the bulk descriptors with the direction bit clear; bench.py:260 |
 | `usb.packet_size` | - | settles | same line, each endpoint's maximum packet size; the IN lines' byte counts agree (bench.py:285) |
 | `usb.in_transfer_multiple` | - | settles | byte count of every `IN` line of Command 7's reply, the last included; bench.py:285 records each packet, :286 flags a short one |
-| `command.request_system_status` | - | settles | an `OUT` line holding the command's number alone, and the `IN` lines that answer it as a list; bench.py:309, :285 |
+| `command.request_system_status` | - | settles | an `OUT` line that sends the command's number with no parameters, in the framing used, and the `IN` lines that answer it as a list; bench.py:309, :285 |
 | `command.open` | - | bears on | `OUT` starts with it and the reply is a braced list; but no framing leaves it off, so "must" is untested |
 | `command.close` | - | bears on | as `command.open`, for the closing character |
 | `command.prefix` | - | bears on | the `s-cr` framing is sent (bench.py:126-134); an answer shows it is accepted, not that it is needed. Settled by step 2 only if step 1 is silent (Q1) |
@@ -87,6 +88,11 @@ Each row: key, channels, word, then what in the trace shows it and where the cod
 | `status.error_position` | - | bears on | the value at the place this fact names reads zero in a healthy unit; missing: a unit in error, and other places may read zero too |
 | `status.system_state_position` | - | bears on | the value at the place this fact names reads like an idle code; missing: a state change at that place, which no step makes (see suggestion 4) |
 | `status.state_idle` | - | bears on | an idle unit's reply; depends on `status.system_state_position` being the place read |
+| `status.state_armed` | - | bears on | the Command 7 reply holds the system state at the place `status.system_state_position` names, recorded before any step acts (bench.py:489) and decoded there (:179-189); it shows this code only if the unit arrives armed, which no step causes. Depends on `status.system_state_position` |
+| `status.state_busy` | - | bears on | the Command 7 reply holds the system state at the place `status.system_state_position` names, recorded before any step acts (bench.py:489) and decoded there (:179-189); it shows this code only if the unit arrives busy, which no step causes. Depends on `status.system_state_position` |
+| `status.state_done` | - | bears on | the Command 7 reply holds the system state at the place `status.system_state_position` names, recorded before any step acts (bench.py:489) and decoded there (:179-189); it shows this code only if the unit arrives done, which no step causes. Depends on `status.system_state_position` |
+| `status.quicksetup_flag` | - | bears on | the Command 7 reply holds the system state at the place `status.system_state_position` names, recorded before any step acts (bench.py:489) and decoded there (:179-189); it shows this flag only if the unit arrives with the flag set, which no step causes. Depends on `status.system_state_position`, and on the state codes, since the flag's amount is what is left after a state's code |
+| `status.unretrieved_data_flag` | - | bears on | the Command 7 reply holds the system state at the place `status.system_state_position` names, recorded before any step acts (bench.py:489) and decoded there (:179-189); it shows this flag only if the unit arrives with the flag set, which no step causes. Depends on `status.system_state_position`, and on the state codes, since the flag's amount is what is left after a state's code |
 
 ## Placed under Step 2: Command 7 in each framing
 
@@ -104,7 +110,7 @@ no `IN` line, and that is itself the finding.
 | `command.channel_setup_reply` | - | settles | no `IN` line after that `OUT` before the next `OUT`; bench.py:391, :316-323. Silence is shown only within that listen; a later reply would land after the next command |
 | `command.request_channel_data` | - | bears on | each one `OUT` line and a reply of one value (bench.py:393, :352-358). What the value is, is Q4 |
 | `command.separator` | - | bears on | commands with parameters are sent, and answered; no run changes the character, so only "accepted" is shown |
-| `collection.sample_time_default` | - | bears on | the Command 7 reply after the reset holds the last run's sample time. Missing: a fact giving that value's place in the reply, which the facts file lacks, and that a reset leaves it at the default |
+| `collection.sample_time_default` | - | bears on | the Command 7 reply after the reset holds the last run's sample time. Missing: a fact giving that value's place in the reply, which the facts file lacks, and that a reset leaves it at the default. Step 1's reply holds the same value before the reset, but cannot tell a default from one an earlier run set |
 | `channel.ch1` | - | bears on | Commands 1 and 9 name channel 1 and draw a value; missing: the voltage applied at the port labelled CH1, which is in the owner's notes and the file's name, not in the trace |
 | `channel.operation_auto_id` | - | bears on | the operation is sent and the next status shows no error (bench.py:390-392); missing: any sign that the unit identified a sensor |
 | `channel_data.mode_retest` | - | bears on | an `OUT` line for Command 9 in the retest mode, and one value (bench.py:393); step 4 and step 5 repeat it. Missing: a sensor changed between the two modes |
@@ -151,13 +157,8 @@ shows no `usb.` descriptor fact.
 | `data.byte_order` | - | not reached | binary mode is not run |
 | `data.realtime_time_counter_bits` | - | not reached | no real-time collection is run |
 | `data.checksum` | - | not reached | it concerns binary records, which are not collected |
-| `status.state_armed` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but no step arms the unit, so the trace never shows its code |
-| `status.state_busy` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but no step runs a collection, so the trace never shows its code |
-| `status.state_done` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but no step runs a collection, so the trace never shows its code |
 | `status.state_self_test` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but the self-test runs at power-up, before the cable is connected, so a reply could show its code only by chance |
 | `status.state_initializing` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but the steps wait for the beeps, so a reply could show its code only by chance at start-up |
-| `status.quicksetup_flag` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but the runbook says to leave Quick Setup alone, so no step sets this flag and the trace never shows its amount |
-| `status.unretrieved_data_flag` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but no step collects data, so no step sets this flag and the trace never shows its amount, unless a unit arrives holding some |
 | `collection.max_points` | - | not reached | no step sends Command 3 |
 | `collection.realtime_points` | - | not reached | no step sends Command 3 |
 | `collection.sample_time_min` | - | not reached | no step sends Command 3 |
