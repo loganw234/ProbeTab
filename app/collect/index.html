@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProbeTab: collect data</title>
+<meta name="description" content="Collect a temperature run in this browser tab, with made-up practice readings for now, and save it as a spreadsheet.">
+<!--
+  The classroom screen, first piece: practice readings only. No LabPro is connected by this page.
+  Its code is app/src/collect/, built into app/web/collect/ (app/README.md says how).
+  This page loads nothing from another site: no fonts, scripts, styles or images. Its one script
+  is its own built module, by a relative path. app/test/collect-page.test.ts holds that.
+  The look is the mockup's (app/mockup/index.html), with the owner's six answers applied.
+  No LabPro value is typed here: the power details are read from the generated facts by the script.
+  The words and the marks that say practice readings are made up are in app/src/collect/words.ts.
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f3f5f8; --card: #ffffff; --fg: #15181c; --muted: #454d57; --line: #c9d0d9;
+    --accent: #0b57d0; --on-accent: #ffffff; --danger: #b3261e; --on-danger: #ffffff;
+    --series: #b9420a; --hl: #fff0d6; --ok: #146c2e;
+    --warn-bg: #fff3c4; --warn-fg: #3a2c00; --warn-line: #8a6400; --focus: #0b57d0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151a; --card: #1c2128; --fg: #eef1f5; --muted: #b6bec9; --line: #3a424d;
+      --accent: #8ab4f8; --on-accent: #0a1020; --danger: #f2a8a2; --on-danger: #2a0a08;
+      --series: #ff9a57; --hl: #3a2f16; --ok: #7ddc96;
+      --warn-bg: #3b2f06; --warn-fg: #ffe9a6; --warn-line: #d9a520; --focus: #8ab4f8;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 1rem/1.5 system-ui, sans-serif; }
+  .wrap { max-width: 80rem; margin: 0 auto; padding: 0 1rem; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  .banner { background: var(--warn-bg); color: var(--warn-fg); border-bottom: 3px solid var(--warn-line); padding: 0.45rem 0; font-weight: 600; }
+  .banner p { margin: 0; }
+  .note { margin: 0.4rem 0 0; padding: 0.3rem 0.7rem; border: 1px solid var(--warn-line); background: var(--warn-bg); color: var(--warn-fg); border-radius: 0.4rem; }
+
+  header { padding: 0.5rem 0 0.2rem; }
+  header .wrap { display: flex; align-items: baseline; gap: 0.3rem 0.8rem; flex-wrap: wrap; }
+  h1 { font-size: 1.5rem; margin: 0; }
+  header p { margin: 0; color: var(--muted); }
+  .corner { margin-left: auto; font-size: 0.95rem; color: var(--muted); }
+  .corner label { cursor: pointer; padding: 0.2rem 0.3rem; }
+  .corner input { margin-right: 0.35rem; accent-color: var(--accent); }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 0.6rem; padding: 0.7rem 1rem; }
+  h2 { font-size: 1rem; margin: 0 0 0.2rem; color: var(--muted); font-weight: 600; }
+
+  .action { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1.5rem; margin: 0.4rem 0 0.8rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; margin: 0 0 0.3rem; padding: 0; list-style: none; }
+  .chips:empty { display: none; }
+  .chips li { border: 1px solid var(--line); border-radius: 2rem; padding: 0.1rem 0.7rem; background: var(--bg); }
+  .chips .ok { color: var(--ok); font-weight: 600; }
+  .msg { margin: 0; font-size: 1.15rem; max-width: 44rem; }
+  .small { margin: 0.2rem 0 0; font-size: 0.95rem; color: var(--muted); max-width: 44rem; }
+  .doit { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.6rem 1rem; }
+  .btn { font: inherit; font-weight: 700; border-radius: 0.6rem; border: 2px solid var(--accent); background: var(--card); color: var(--accent); padding: 0.6rem 1.2rem; cursor: pointer; }
+  .btn.primary { background: var(--accent); color: var(--on-accent); }
+  .btn.stop { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+  .btn.big { font-size: 1.6rem; padding: 0.7rem 2rem; min-height: 3.6rem; }
+  .btn:disabled { background: var(--bg); border-color: var(--line); border-style: dashed; color: var(--muted); cursor: not-allowed; }
+  .field { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.95rem; }
+  .field select { font: inherit; padding: 0.4rem 0.5rem; border-radius: 0.4rem; border: 1px solid var(--muted); background: var(--card); color: var(--fg); min-height: 2.6rem; }
+  #settings { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.6rem 1rem; }
+  .doit p { margin: 0; }
+  progress { width: 12rem; height: 1rem; vertical-align: middle; accent-color: var(--accent); }
+  .after { display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-start; }
+  .after .btnrow { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; }
+
+  .cols { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(15rem, 1fr); gap: 0.8rem; align-items: start; }
+  .reading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 1.2rem; }
+  .big { font-size: clamp(3.6rem, 9vw, 6rem); font-weight: 700; line-height: 1.05; margin: 0; font-variant-numeric: tabular-nums; }
+  .big small { font-size: 0.45em; font-weight: 600; }
+  .sub { margin: 0; color: var(--muted); font-size: 1.05rem; }
+  .pill { display: inline-block; border: 1px solid var(--warn-line); background: var(--warn-bg); color: var(--warn-fg); border-radius: 1rem; padding: 0 0.6rem; font-size: 0.9rem; font-weight: 600; }
+  figure { margin: 0; }
+  figcaption, caption { color: var(--muted); font-size: 0.95rem; text-align: left; padding: 0.2rem 0; }
+  svg { display: block; width: 100%; height: auto; max-height: 40vh; min-height: 11rem; }
+  svg text { fill: var(--muted); font-size: 16px; font-family: inherit; }
+  svg .grid { stroke: var(--line); stroke-width: 1; }
+  svg .axis { stroke: var(--muted); stroke-width: 1.5; }
+  svg .line { fill: none; stroke: var(--series); stroke-width: 3.5; stroke-linejoin: round; }
+  svg .dot { fill: var(--series); stroke: var(--card); stroke-width: 2; }
+  svg text.hint { fill: var(--fg); font-size: 18px; }
+  svg text.mark { fill: var(--warn-fg); font-size: 16px; font-weight: 700; }
+  .scroll { max-height: 26rem; overflow: auto; border-radius: 0.3rem; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 0.25rem 0.6rem; text-align: right; border-bottom: 1px solid var(--line); }
+  thead th { position: sticky; top: 0; background: var(--card); border-bottom: 2px solid var(--muted); }
+  tr.empty td { text-align: left; color: var(--muted); }
+  tr.newest { background: var(--hl); font-weight: 700; }
+
+  footer { padding: 1rem 0 1.5rem; font-size: 0.9rem; color: var(--muted); }
+  footer p { margin: 0.2rem 0; }
+
+  @media (max-width: 60rem) {
+    .cols { grid-template-columns: minmax(0, 1fr); }
+    .scroll { max-height: 20rem; }
+  }
+  @media (max-width: 30rem) {
+    .btn.big { width: 100%; font-size: 1.4rem; padding: 0.7rem 1rem; }
+    .doit, .doit .field, .doit .field select, #settings { width: 100%; }
+    .corner { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="banner" id="banner" role="region" aria-label="About these readings" hidden></div>
+
+<header>
+  <div class="wrap">
+    <h1>ProbeTab</h1>
+    <p>Collect data from a sensor in this browser tab.</p>
+    <div class="corner"><label><input type="checkbox" id="unit-f">Show °F</label></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <noscript><p class="card msg">This page needs JavaScript, which is turned off in this browser.</p></noscript>
+  <section class="card action" aria-label="What to do next">
+    <div>
+      <ul class="chips" id="chips" aria-label="What is plugged in"></ul>
+      <div role="status" aria-live="polite">
+        <p class="msg" id="message"></p>
+      </div>
+      <p class="small" id="power-block" hidden><span id="power-lead"></span> <span id="power-detail"></span></p>
+      <p class="small" id="connect-note" hidden></p>
+      <p class="note" id="storage-line" role="status" hidden></p>
+    </div>
+    <div class="doit">
+      <button type="button" class="btn big" id="btn-connect" disabled>Connect the LabPro</button>
+      <button type="button" class="btn primary big" id="btn-practice">Practise with made-up readings</button>
+      <div id="settings" hidden>
+        <div class="field">
+          <label for="sel-every">Take a reading every</label>
+          <select id="sel-every"></select>
+        </div>
+        <div class="field">
+          <label for="sel-for">Stop after</label>
+          <select id="sel-for"></select>
+        </div>
+      </div>
+      <button type="button" class="btn primary big" id="btn-start" hidden>Start</button>
+      <p id="progress-wrap" hidden><label for="progress" id="progress-label"></label><br><progress id="progress" value="0" max="120"></progress></p>
+      <button type="button" class="btn stop big" id="btn-stop" hidden>Stop</button>
+      <div class="after">
+        <div class="btnrow">
+          <button type="button" class="btn primary big" id="btn-save" hidden>Save as spreadsheet</button>
+          <button type="button" class="btn" id="btn-another" hidden>Collect another run</button>
+          <button type="button" class="btn" id="btn-clear" hidden>Clear</button>
+        </div>
+        <p class="small" id="clear-note" hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <div class="cols">
+    <div>
+      <section class="card" aria-label="The temperature now">
+        <div class="reading">
+          <p class="big"><span id="big" role="img" aria-label="no reading yet">– –</span><small id="big-unit"></small></p>
+          <div>
+            <p class="sub">Temperature <span class="pill" id="pill" hidden></span></p>
+            <p class="sub" id="sub">No reading yet.</p>
+          </div>
+        </div>
+      </section>
+      <figure class="card" style="margin-top:0.8rem">
+        <h2 id="graph-h">Graph</h2>
+        <div id="graph"></div>
+        <figcaption id="graph-caption"></figcaption>
+      </figure>
+    </div>
+
+    <section class="card" aria-labelledby="table-h">
+      <h2 id="table-h">Table</h2>
+      <div class="scroll" role="region" aria-label="Table of readings, scrolls" tabindex="0">
+        <table>
+          <caption id="table-caption"></caption>
+          <thead><tr><th scope="col">Time (seconds)</th><th scope="col" id="th-temp">Temperature (°C)</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>ProbeTab is an independent project. It is not affiliated with, or endorsed by, Vernier or Texas Instruments.</p>
+    <p>This page has not been tried with a screen reader or on a Chromebook. It keeps your last run in this browser only; nothing leaves this computer.</p>
+  </div>
+</footer>
+<script type="module" src="../web/collect/page.js"></script>
+</body>
+</html>
