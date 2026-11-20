@@ -18,7 +18,8 @@ hold, not what they do.
 
 - **settles:** if the step runs as the runbook writes it, its trace holds the
   bytes or header lines that show the fact true or false. The row names them
-  and the code that writes them there.
+  and the code that writes them there. The `usb.` rows settle the true case
+  only; see the limit below.
 - **bears on:** the trace holds something consistent or inconsistent with the
   fact, but cannot settle it alone. The row says what is missing.
 - **not reached:** no step's trace touches it. The row says why.
@@ -37,9 +38,9 @@ Rules for placing a row:
 
 **One limit on the USB rows.** `bulk_pair` (`labpro_bench.py:206-238`) checks
 the endpoints before the descriptors are read. A unit that fails the check
-writes no descriptor lines, and often no trace. So the `usb.` rows settle a fact
-that is true. A false one leaves a refusal on the screen, which is not
-evidence.
+makes no transfer, so the script writes no trace (`labpro_bench.py:623`). So the
+`usb.` rows settle the true case only. A false one leaves a refusal on the
+screen, which is not evidence.
 
 ## What each step's trace is for
 
@@ -80,11 +81,11 @@ Each row: key, channels, word, then what in the trace shows it and where the cod
 | `reply.terminator` | - | settles | the `IN` line holding the end of Command 7's reply: the carriage return, then what follows it in that packet (zeros, or a line feed); bench.py:285, :290 (Q7) |
 | `data.ascii_number_format` | - | settles | the reply's text: each value's sign, digits and exponent, as written in the `IN` bytes; checked at bench.py:157-161 after the packets are recorded |
 | `status.register_count` | - | settles | the number of comma-separated values in Command 7's reply; bench.py:169-171 |
-| `status.check_value` | - | settles | the constant in the reply's fourth place; bench.py:172-175 |
+| `status.check_value` | - | settles | the constant at the place `status.check_value_position` names; bench.py:172-175 |
 | `status.check_value_position` | - | settles | the same value, where it stands in the reply; bench.py:172-175 |
-| `status.software_id_position` | - | bears on | `firmware` header line is the reply's first value (bench.py:490, :530), in the form of a version; missing: the unit's version from any other source, to tell it is one |
-| `status.error_position` | - | bears on | the second value reads zero in a healthy unit; missing: a unit in error, and other places may read zero too |
-| `status.system_state_position` | - | bears on | the fourteenth value reads like an idle code; missing: a state change at that place, which no step makes (see suggestion 4) |
+| `status.software_id_position` | - | bears on | `firmware` header line is the value at the place this fact names (bench.py:490, :530), in the form of a version; missing: the unit's version from any other source, to tell it is one |
+| `status.error_position` | - | bears on | the value at the place this fact names reads zero in a healthy unit; missing: a unit in error, and other places may read zero too |
+| `status.system_state_position` | - | bears on | the value at the place this fact names reads like an idle code; missing: a state change at that place, which no step makes (see suggestion 4) |
 | `status.state_idle` | - | bears on | an idle unit's reply; depends on `status.system_state_position` being the place read |
 
 ## Placed under Step 2: Command 7 in each framing
@@ -98,15 +99,16 @@ no `IN` line, and that is itself the finding.
 | Fact | Channels | Word | What the trace holds, and the code |
 |---|---|---|---|
 | `command.reset` | - | bears on | an `OUT` line for it (bench.py:384), then Command 7 reading idle; a unit already idle reads idle either way. Missing: a unit whose state a reset changes. Depends on `status.system_state_position` |
-| `command.reset_reply` | - | settles | no `IN` line between that `OUT` and the next `OUT`: the script listens 300 ms and records anything that comes (bench.py:385, :316-323) |
+| `command.reset_reply` | - | settles | no `IN` line between that `OUT` and the next `OUT`: the script listens 300 ms and records anything that comes (bench.py:385, :316-323). Silence is shown only within that listen; a later reply would land after the next command |
 | `command.channel_setup` | - | bears on | an `OUT` line (bench.py:390), then Command 7 with a zero error register (:392). Missing: any visible effect of the setup |
-| `command.channel_setup_reply` | - | settles | no `IN` line after that `OUT` before the next `OUT`; bench.py:391, :316-323 |
+| `command.channel_setup_reply` | - | settles | no `IN` line after that `OUT` before the next `OUT`; bench.py:391, :316-323. Silence is shown only within that listen; a later reply would land after the next command |
 | `command.request_channel_data` | - | bears on | each one `OUT` line and a reply of one value (bench.py:393, :352-358). What the value is, is Q4 |
 | `command.separator` | - | bears on | commands with parameters are sent, and answered; no run changes the character, so only "accepted" is shown |
+| `collection.sample_time_default` | - | bears on | the Command 7 reply after the reset holds the last run's sample time. Missing: a fact giving that value's place in the reply, which the facts file lacks, and that a reset leaves it at the default |
 | `channel.ch1` | - | bears on | Commands 1 and 9 name channel 1 and draw a value; missing: the voltage applied at the port labelled CH1, which is in the owner's notes and the file's name, not in the trace |
 | `channel.operation_auto_id` | - | bears on | the operation is sent and the next status shows no error (bench.py:390-392); missing: any sign that the unit identified a sensor |
 | `channel_data.mode_retest` | - | bears on | an `OUT` line for Command 9 in the retest mode, and one value (bench.py:393); step 4 and step 5 repeat it. Missing: a sensor changed between the two modes |
-| `channel_data.mode_stored` | - | bears on | the second Command 9 (bench.py:395), one value; the script reads both back to back, so the stored value cannot differ from the present one |
+| `channel_data.mode_stored` | - | bears on | Command 9 in the stored mode (bench.py:395), one value; read back to back, the two differ only if the input changes between them |
 
 ## Placed under Step 4: The battery drain
 
@@ -142,25 +144,24 @@ shows no `usb.` descriptor fact.
 | `sensor_supply.max_current` | - | not reached | a limit no step comes near |
 | `command.data_collection_setup` | - | not reached | no step sends Command 3 |
 | `command.conversion_equation_setup` | - | not reached | no step sends Command 4 |
-| `data.get_request` | - | not reached | no step collects data, so no `g` is sent |
+| `data.get_request` | - | not reached | no step collects data, so `data.get_request` is never sent |
 | `data.binary_mode_command` | - | not reached | no step sends it (Q3) |
 | `data.binary_packing_max` | - | not reached | binary mode is not run |
 | `data.binary_sample_bits` | - | not reached | binary mode is not run |
 | `data.byte_order` | - | not reached | binary mode is not run |
 | `data.realtime_time_counter_bits` | - | not reached | no real-time collection is run |
 | `data.checksum` | - | not reached | it concerns binary records, which are not collected |
-| `status.state_armed` | - | not reached | no step arms the unit |
-| `status.state_busy` | - | not reached | no step runs a collection |
-| `status.state_done` | - | not reached | no step runs a collection |
-| `status.state_self_test` | - | not reached | the self-test runs at power-up, before the cable is connected |
-| `status.state_initializing` | - | not reached | the steps wait for the beeps; a read at start-up would be luck |
-| `status.quicksetup_flag` | - | not reached | the runbook says to leave Quick Setup alone |
-| `status.unretrieved_data_flag` | - | not reached | no step collects data; a unit that arrives holding some would show it |
+| `status.state_armed` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but no step arms the unit, so the trace never shows its code |
+| `status.state_busy` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but no step runs a collection, so the trace never shows its code |
+| `status.state_done` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but no step runs a collection, so the trace never shows its code |
+| `status.state_self_test` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but the self-test runs at power-up, before the cable is connected, so a reply could show its code only by chance |
+| `status.state_initializing` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but the steps wait for the beeps, so a reply could show its code only by chance at start-up |
+| `status.quicksetup_flag` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but the runbook says to leave Quick Setup alone, so no step sets this flag and the trace never shows its amount |
+| `status.unretrieved_data_flag` | - | not reached | every Command 7 reply holds the system state, at the place `status.system_state_position` names; but no step collects data, so no step sets this flag and the trace never shows its amount, unless a unit arrives holding some |
 | `collection.max_points` | - | not reached | no step sends Command 3 |
 | `collection.realtime_points` | - | not reached | no step sends Command 3 |
 | `collection.sample_time_min` | - | not reached | no step sends Command 3 |
 | `collection.sample_time_max` | - | not reached | no step sends Command 3 |
-| `collection.sample_time_default` | - | not reached | no step sends Command 3; Command 7's reply may show a sample time after the reset, but the map does not read that as this fact |
 | `channel.operation_voltage_0_5` | - | not reached | the script sends the auto-ID operation only (bench.py:390) |
 
 ## The seven questions
@@ -173,19 +174,18 @@ From [protocol/REFERENCE.md](../protocol/REFERENCE.md), "What Phase 0 has to set
 | Q2 | bears on | 1 | the bytes and how they sit in packets are settled (`IN` lines, bench.py:285). The unit's software ID rests on `status.software_id_position`, which is bears on |
 | Q3 | not reached | - | no step sends the binary-mode command or collects data |
 | Q4 | bears on | 3 | the value's text is in each `IN` line. The voltage applied is not in the trace, only in the owner's notes and the file's name |
-| Q5 | not reached | - | step 3 sends channel 1 with operation 1, which is the same two bytes in either order |
+| Q5 | not reached | - | step 3 sends `channel.ch1` with `channel.operation_auto_id`, whose values in the facts file are equal, so the bytes are the same in either order |
 | Q6 | not reached | - | no step collects in real time. Step 4's Command 9 is one request for each reply, not the real-time path |
-| Q7 | settles | 1 | the bytes after the carriage return in the reply's last packet. If the carriage return ends a packet, step 1 does not read on; step 3's replies do (bench.py:357) |
+| Q7 | settles | 1, 3 | the bytes after the carriage return in the reply's last packet. If the carriage return ends a packet, step 1 does not read on; step 3's replies do (bench.py:357) |
 
 ## Suggestions, for the owner's call
 
 Each is a small addition to a step. None is made here.
 
-1. **Q5 and `channel.operation_voltage_0_5`:** in step 3, also send channel 1 with the 0 to 5 V operation, which needs a small option in the script, so that the two orders send different bytes.
-2. **Q1, `command.prefix`, `command.serial_terminator`:** after step 1 is answered, run each other framing once, with a power-cycle after any that draws no reply.
+1. **Q5 and `channel.operation_voltage_0_5`:** in step 3, also send `channel.ch1` with the operation `channel.operation_voltage_0_5` names, which needs a small option in the script, so that the two orders send different bytes.
+2. **Q1, `command.prefix`, `command.serial_terminator`:** after step 1 is answered, run each other framing once, but only while step 1's Command 7 shows no data not yet retrieved, since a power-cycle after a silent framing clears held data.
 3. **Q4, `channel.ch1`:** write the applied voltage into each CH1 trace as its note, so the evidence does not rest on a file name; it needs a small option in the script.
-4. **`status.system_state_position`, `status.quicksetup_flag`, `status.state_idle`:** with no data held, press Quick Setup once and run step 1's Command 7 alone, and the place that moves by the flag's amount is the state's.
-5. **The `usb.` rows' false case:** have `--descriptors` write the descriptor lines before the endpoint check, so a mismatch is also in the trace.
+4. **`status.system_state_position`, `status.quicksetup_flag`, `status.state_idle`:** after step 1's Command 7 shows no data held, press Quick Setup once and run step 1's Command 7 alone, and the place that moves by the flag's amount is the state's.
 
 ## The limits
 
