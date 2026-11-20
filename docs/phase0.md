@@ -3,6 +3,9 @@
 The runbook for the first sessions with a LabPro, on the MacBook. Each step
 says what to run, what to watch for, and what to keep.
 
+[phase0-evidence.md](phase0-evidence.md) is a map of which facts each step's
+trace can settle.
+
 A reading that looks right is not evidence that it is right. What counts is
 the trace each step writes, kept as the last section says.
 
