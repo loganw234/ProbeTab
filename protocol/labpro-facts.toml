@@ -261,6 +261,13 @@ page = 39
 evidence = "Command 4 Conversion Equation Setup (Analog)"
 status = "manual"
 
+[command.system_setup]
+value = 6
+source = "trm"
+page = 44
+evidence = "Command 6 System Setup"
+status = "manual"
+
 [command.request_system_status]
 value = 7
 source = "trm"
@@ -306,6 +313,30 @@ page = 32
 evidence = "Return values: No information is returned."
 status = "manual"
 note = "Said of Command 1. The bench script listens briefly after it, and records anything that comes."
+
+[command.system_setup_reply]
+value = "nothing"
+source = "trm"
+page = 44
+evidence = "Return values: No information is returned."
+status = "manual"
+note = "Said of Command 6. A host listens briefly after it, and records anything that comes."
+
+[system_setup.sound_off]
+value = 3
+source = "trm"
+page = 44
+evidence = "2 Abort Sampling 3 Turn sound off"
+status = "manual"
+note = "The value of Command 6's first parameter, syssetup, that turns the unit's sound off."
+
+[system_setup.sound_on]
+value = 4
+source = "trm"
+page = 44
+evidence = "3 Turn sound off 4 Turn sound on"
+status = "manual"
+note = "The value of Command 6's first parameter, syssetup, that turns the unit's sound on."
 
 [command.open]
 value = "{"
@@ -451,6 +482,29 @@ page = 45
 evidence = "system state The following values are used for the system state:"
 status = "manual"
 note = "Page 45's table does not number its rows. The place is the row's, counted by the lead, and page 46's example reply has 1, idle, fourteenth."
+
+[status.piezo_flag_position]
+value = 13
+unit = "place in the reply, counting from 1"
+source = "trm"
+page = 45
+evidence = "piezo flag This is the buzz/no-buzz value that was last commanded."
+status = "manual"
+note = "Page 45's table does not number its rows. The place is the row's, counted by the lead: the row just before the system state's."
+
+[status.piezo_off]
+value = 0
+source = "trm"
+page = 45
+evidence = "0 Sound is disabled (OFF)"
+status = "manual"
+
+[status.piezo_on]
+value = 1
+source = "trm"
+page = 45
+evidence = "1 Sound is enabled (ON)"
+status = "manual"
 
 [status.state_idle]
 value = 1
