@@ -23,13 +23,16 @@ says the script agrees with that model, not with a LabPro. A recording from
 the bench can be replayed the same way.
 
 One thing it can do beyond replaying, when asked to with command_1_errors: set
-the error register. See CHANNEL_ROWS and FakeLabPro.error. That is the lead's model
-of a LabPro, BELIEVED and not measured, so it is off unless a test asks, and a
-replay of a recording never has a reply rewritten.
+the error register. See CHANNEL_ROWS and FakeLabPro.error. That is the fake's own
+model of a LabPro, and the real unit's code differs (see CHANNEL_ROWS), so it is
+off unless a test asks, and a replay of a recording never has a reply rewritten.
 
 The descriptors' other fields, such as the endpoint addresses and the class
 codes, are this file's inventions, chosen so that a script relying on them
-would fail. Nothing here says what a LabPro reports for them.
+would fail. The real unit's are in the header of
+protocol/traces/2026-11-25-first-contact.trace, and some match: both class codes
+are 0xFF and the IN endpoint is 0x82, as here. So the fake no longer catches a
+script that relies on those.
 """
 import array
 import struct
@@ -38,13 +41,15 @@ import usb.backend
 import usb.core
 import usb.util
 
-IN_ADDRESS = 0x82   # invented: a LabPro's addresses are for the bench to show
-OUT_ADDRESS = 0x01  # invented, and numbered apart from IN_ADDRESS on purpose
-# BELIEVED, the lead's model and not a measurement: a unit that is told to set up a channel
-# no row of page 31's table holds sets its error register (page 45 says it is non-zero after a
-# fault) and keeps it until Command 0 clears the error state (page 30). The channels come from
-# the facts, one fact for each row of that table, named here. The code the fake sets is
-# invented: the manual's pages give none for this fault.
+IN_ADDRESS = 0x82   # invented, and the real unit's too (2026-11-25-first-contact.trace)
+OUT_ADDRESS = 0x01  # invented, and numbered apart from IN_ADDRESS on purpose; the real unit's is 0x02
+# The fake's own model: a unit that is told to set up a channel no row of page 31's table holds
+# sets its error register (page 45 says it is non-zero after a fault) and keeps it until
+# Command 0 clears the error state (page 30). The channels come from the facts, one fact for
+# each row of that table, named here. The fake sets code 1. The real unit drew 12 for channel 14
+# (protocol/traces/2026-11-25-ch1-volt-opfirst.trace), which the manual's table of error codes
+# gives for a channel that does not exist, and read 0 again at the next run, before that run's reset
+# (2026-11-25-ch1-0v.trace), for a cause not settled.
 CHANNEL_ROWS = ("channel.numbers_all", "channel.numbers_analog", "channel.numbers_sonic",
                 "channel.numbers_digital_in", "channel.numbers_digital_out")
 ERROR_CODE = 1

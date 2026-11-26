@@ -11,13 +11,19 @@ The bench script for Phase 0 with a LabPro, and its tests.
     CH1, and takes a live reading.
   - Its docstring says what it does and what it refuses.
 - [fake_backend.py](fake_backend.py) is a pyusb backend that stands in for a
-  LabPro by replaying a trace: a fixture now, and a recording once there is
-  one. It also answers requests for the device's descriptors.
+  LabPro by replaying a trace: a fixture, or a recording from
+  [protocol/traces/](../../protocol/traces/FORMAT.md). The tests replay
+  fixtures. It also answers requests for the device's descriptors.
   - **When a test asks,** it also models one fault: Command 1 for a channel
-    that page 31's list does not hold sets the error register, until Command 0.
-    It reads that list from the facts' `channel.numbers_*` rows. That is the
-    lead's model, BELIEVED and not measured. It is off otherwise, so a
-    replayed recording is never rewritten.
+    that page 31's list does not hold sets the error register, and the fake
+    keeps it until Command 0. It reads that list from the facts'
+    `channel.numbers_*` rows. That is the fake's own model. The real unit, on
+    2026-11-25, drew error 12 for such a channel, where the fake sets 1
+    ([ch1-volt-opfirst](../../protocol/traces/2026-11-25-ch1-volt-opfirst.trace)),
+    and read 0 again at the next run, before that run's reset
+    ([ch1-0v](../../protocol/traces/2026-11-25-ch1-0v.trace)), for a cause not
+    settled. The model is off unless a test asks, so a replayed recording is
+    never rewritten.
 - [test_bench.py](test_bench.py) and [test_ch1.py](test_ch1.py) run the script
   against the fake. The gate's `bench` check runs them.
 - **The browser bench page's Python side:**
@@ -58,7 +64,9 @@ Talking to a LabPro also needs libusb, the library pyusb reaches USB through:
 - **Linux:** the distribution's libusb-1.0.
 - **Windows:** libusb's DLL, and the WinUSB driver bound to the LabPro. That
   changes the machine's drivers, and the plan leaves it to the owner's hand.
-  Without the driver, the script refuses, naming it.
+  With no driver at all, libusb does not list the LabPro, and the script
+  refuses "no LabPro found" (seen on 2026-11-25). With another driver bound,
+  the refusal names WinUSB (BELIEVED, untried).
 
 ## At the bench
 
@@ -111,7 +119,8 @@ with Command 7 checked every tenth reading.
   two parameters. Channel first is the default, as page 31 writes it. With
   auto-ID the two orders send the same bytes, since the facts give the channel
   and auto-ID the same number; so the order shows only with `--operation
-  voltage`. Which order a unit takes is for the bench (Q5).
+  voltage`. On 2026-11-25 the unit took the channel first
+  ([protocol/REFERENCE.md](../../protocol/REFERENCE.md), question 5).
 - **`--applied VOLTS` and `--meter VOLTS`** record the voltage set on the supply,
   and a meter's reading if there is one, in the trace's `note`, after the text
   the script writes there, exactly as typed. Each is an optional minus sign,
@@ -198,9 +207,9 @@ The gate then holds it to the format and to its hash.
 
 - **The tests show agreement with the fake, not with a LabPro.** The fake is the
   lead's model of a LabPro, built from the facts and the fixtures.
-- **Nothing here has run against real hardware or a real backend.** The libusb
-  version in a trace's `stack` line is read through ctypes, and that read is
-  untested until Phase 0.
+- **It has run against real hardware in one session:** a LabPro, on Windows 11
+  through libusb 1.0.30, on 2026-11-25. The libusb version in a trace's `stack` line
+  is read through ctypes; it gave 1.0.30 there, and is untried on other hosts.
 - **Standard USB requests are not in the trace.** pyusb and libusb read the
   device's descriptors and its active configuration, and the script has pyusb
   set the first configuration when that read fails. A trace holds bulk
@@ -208,8 +217,12 @@ The gate then holds it to the format and to its hash.
   header holds the descriptors when `--descriptors` asks for them.
 - **The descriptors are as the host's USB stack gives them.** libusb may
   answer from its cache (BELIEVED).
-- **What CH1's value means is for the bench to show:** a reading in the
-  sensor's units, or a raw voltage. Known voltages from a bench supply show it.
+- **What CH1's value means is not settled:** a reading in the sensor's units,
+  or a raw voltage. On 2026-11-25, CH1 read near the nominal voltages of the
+  cells the owner put on it, with a probe the owner believes reads volts. A
+  sensor that reads in other units, and a
+  metered source, are still needed
+  ([protocol/REFERENCE.md](../../protocol/REFERENCE.md), question 4).
 - **The script reads nothing before its first Command 7.** A reply left over
   from an earlier session would be read as this one's. The trace would show
   it.
@@ -233,10 +246,12 @@ The gate then holds it to the format and to its hash.
   spells `protocol/fixtures` in other letters may get past the guard against
   writing among the fixtures (BELIEVED, not run).
 - **Collection with Command 3 and `g` waits for Phase 1.**
-- **The page's server rests on two beliefs, unchecked until Phase 0:**
-  - Chromium counts `127.0.0.1` as a secure origin, which WebUSB needs;
+- **The page's server rests on two beliefs:**
+  - Chromium counts `127.0.0.1` as a secure origin, which WebUSB needs. It was
+    seen once: on 2026-11-25, Chrome 158 on Windows used WebUSB from the page
+    served there, by the lead's record of `serve.py`'s log;
   - Windows' registry can make `.js` plain text, which is why the script keeps
-    its own table.
+    its own table. That one is unchecked.
 - **The converter's refusals of a path the system will not use** are tested
   with stand-ins, not with real paths. One example is `::$DATA` in a folder's
   name, which Windows refuses and other systems take as plain text.

@@ -24,7 +24,8 @@ page runs a build of them, which tsc makes (see [The bench page](#the-bench-page
   for a stock LabPro on the computer's own USB port.
   - It closes the device again when it refuses one.
   - It clears a stalled endpoint's halt before it refuses the transfer.
-  - It is first exercised on real hardware at Phase 0.
+  - It first reached a LabPro on 2026-11-25, in Chrome 158 on Windows with
+    WinUSB bound ([the recording](../protocol/traces/2026-11-25-browser.trace)).
 - [src/protocol/status.ts](src/protocol/status.ts): the commands the bench
   script sends, and their replies, through any transport. These are Command 7,
   Command 0, Command 1 and Command 9, and the system state decoded as page 45
@@ -221,14 +222,16 @@ here. Those settings, and the domain's DNS records, are the owner's.
   - The bench page's steps and its record are tested on Node.
   - Its glue to the page, `page.ts`, is not. The rehearsal ran it in a browser
     on 2026-11-18, by hand, against the simulated LabPro (MEASURED). Against a
-    LabPro, it first runs at Phase 0.
+    LabPro, it first ran on 2026-11-25, in Chrome 158 on Windows
+    ([the recording](../protocol/traces/2026-11-25-browser.trace)).
 - **The WebUSB declarations in `webusb.ts`, and the client-hint declarations in
   `record.ts`, are this project's own.** TypeScript's DOM library has neither.
   They are written from the lead's knowledge of the APIs, not checked against
   their specifications here. A mistake in them would not be caught before
   Phase 0.
 - **On Windows, a browser may reach a stock LabPro only with the WinUSB driver
-  bound to it.** The outline names this as a risk, and Phase 0 measures it.
+  bound to it.** The outline names this as a risk. With WinUSB bound, Chrome 158
+  reached the LabPro on 2026-11-25; without it, a browser was not tried.
 - **A school-managed Chromebook may block WebUSB.**
 - **The page's copies of the bench script's choices** are held to the script's
   by a bench test, `tools/bench/test_browser.py`:

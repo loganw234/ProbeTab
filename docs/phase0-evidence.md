@@ -10,10 +10,11 @@ are named by key. A key's value is in the facts file, and is not repeated here.
 
 **A plan, not a result.** Every row below was made by reading code (READ):
 `tools/bench/labpro_bench.py`, the bench page's code in `app/src/bench/`, and
-the runbook. No LabPro has been connected. Whether a real unit answers as the
-code expects is unknown until the bench. The map says what the traces would
-hold, not what they do. **Every expected outcome about the unit in it is
-BELIEVED.**
+the runbook. It was made before any LabPro had been connected, and says what
+the traces would hold, not what they do. **Every expected outcome about the unit
+in it is BELIEVED.** What the first bench session, on 2026-11-25, settled is in
+[protocol/REFERENCE.md](../protocol/REFERENCE.md), and the facts' statuses say
+which facts its recordings show.
 
 **The runbook it maps** has the four suggestions this map once made adopted:
 step 3's two further Command 1 runs and the applied voltages, step 2's other

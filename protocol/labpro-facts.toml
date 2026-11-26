@@ -37,28 +37,32 @@ value = 0x08F7
 source = "trm"
 page = 22
 evidence = "The LabPro enumerates with VID=08f7 and PID=0x0001."
-status = "manual"
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
 
 [usb.product_id]
 value = 0x0001
 source = "trm"
 page = 22
 evidence = "The LabPro enumerates with VID=08f7 and PID=0x0001."
-status = "manual"
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
 
 [usb.bulk_in_endpoints]
 value = 1
 source = "trm"
 page = 22
 evidence = "There is 1 input bulk endpoint and 1 output bulk endpoint."
-status = "manual"
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
 
 [usb.bulk_out_endpoints]
 value = 1
 source = "trm"
 page = 22
 evidence = "There is 1 input bulk endpoint and 1 output bulk endpoint."
-status = "manual"
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
 
 [usb.packet_size]
 value = 64
@@ -66,7 +70,8 @@ unit = "bytes"
 source = "trm"
 page = 22
 evidence = "The USB packet size for bulk transfers is 64 bytes."
-status = "manual"
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
 
 [usb.in_transfer_multiple]
 value = 64
@@ -74,8 +79,9 @@ unit = "bytes"
 source = "trm"
 page = 22
 evidence = "Transfers from LabPro to PC are always in multiples of 64 bytes."
-status = "manual"
-note = "So the last packet of a reply can carry bytes past its end. Page 23: in ASCII mode a reader stops at the carriage return; in binary mode it counts the samples it asked for."
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
+note = "So the last packet of a reply can carry bytes past its end. Page 23: in ASCII mode a reader stops at the carriage return; in binary mode it counts the samples it asked for. In the 16 recordings of 2026-11-25, all 194 IN transfers were 64 bytes, and each reply's carriage return was followed by a line feed, then zero bytes."
 
 # Ports and converter
 
@@ -99,6 +105,7 @@ source = "trm"
 page = 74
 evidence = "12-bit Successive Approximation ADC"
 status = "manual"
+note = "Consistent with 2026-11-25-ch1-9v.trace and 2026-11-25-ch1-aa-2.trace, whose readings step by about 4.884 mV, which fits 12 bits over 20 V (INFERRED)."
 
 # Sampling. The manual has two modes: real time (RT), where each sample is
 # sent as it is taken, and non-real time (NRT), where samples are stored in the
@@ -238,14 +245,18 @@ value = 0
 source = "trm"
 page = 30
 evidence = "Command 0 Reset LabPro"
-status = "manual"
+status = "bench"
+trace = "2026-11-25-ch1-volt.trace"
+note = "In this trace, place 13 of Command 7's reply, the piezo flag, read 1 before s{0} and 0 after it, with the error register at 0."
 
 [command.channel_setup]
 value = 1
 source = "trm"
 page = 31
 evidence = "Command 1 Channel Setup"
-status = "manual"
+status = "bench"
+trace = "2026-11-25-ch1-volt-opfirst.trace"
+note = "In this trace s{1,14,1} drew error 12, which the manual's table of error codes gives for a channel that does not exist. In 2026-11-25-ch1-9v.trace, s{1,1,1} set up a channel that then read +9.29670E+00."
 
 [command.data_collection_setup]
 value = 3
@@ -266,61 +277,70 @@ value = 6
 source = "trm"
 page = 44
 evidence = "Command 6 System Setup"
-status = "manual"
+status = "bench"
+trace = "2026-11-25-sound-on.trace"
+note = "In this trace s{6,4} took the piezo flag (status.piezo_flag_position) from 0 to 1."
 
 [command.request_system_status]
 value = 7
 source = "trm"
 page = 45
 evidence = "Command 7 Request System Status"
-status = "manual"
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
 
 [command.request_channel_data]
 value = 9
 source = "trm"
 page = 48
 evidence = "Command 9 Request Channel Data"
-status = "manual"
+status = "bench"
+trace = "2026-11-25-ch1-9v.trace"
 
 [command.prefix]
 value = "s"
 source = "trm"
 page = 21
 evidence = "s{command number, parameter 1,"
-status = "manual"
-note = "The manual writes commands this way for a computer host. Whether USB wants the s is for the bench to show."
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
+note = "The manual writes commands this way for a computer host. Over USB, for Command 7, the s was needed: s{7} and a carriage return drew the reply in this trace, and {7} and a carriage return drew nothing within the bench script's 2000 ms (2026-11-25-form-cr.trace)."
 
 [command.serial_terminator]
 value = "\r"
 source = "trm"
 page = 22
 evidence = "a carriage return character follows each command"
-status = "manual"
-note = "Said of the serial port. Whether USB needs the carriage return is for the bench to show."
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
+note = "Said of the serial port. Over USB, for Command 7, the carriage return was needed: s{7} and a carriage return drew the reply in this trace, and s{7} without it drew nothing within the bench script's 2000 ms (2026-11-25-form-s.trace)."
 
 [command.reset_reply]
 value = "nothing"
 source = "trm"
 page = 30
 evidence = "Return values: No information is returned."
-status = "manual"
-note = "Said of Command 0. The bench script listens briefly after it, and records anything that comes."
+status = "bench"
+trace = "2026-11-25-ch1-volt.trace"
+note = "Said of Command 0. In this trace nothing came in the 300 ms the bench script listened after s{0}. It then waited 1.0 s without reading, and the next reply began with { and was whole. That covers the wait only if the unit holds what it sends until it is read (BELIEVED)."
 
 [command.channel_setup_reply]
 value = "nothing"
 source = "trm"
 page = 32
 evidence = "Return values: No information is returned."
-status = "manual"
-note = "Said of Command 1. The bench script listens briefly after it, and records anything that comes."
+status = "bench"
+trace = "2026-11-25-ch1-9v.trace"
+note = "Said of Command 1. The bench script listens briefly after it, and records anything that comes. In this trace nothing came in the 300 ms it listened after s{1,1,1}, and the next reply began with {."
 
 [command.system_setup_reply]
 value = "nothing"
 source = "trm"
 page = 44
 evidence = "Return values: No information is returned."
-status = "manual"
-note = "Said of Command 6. A host listens briefly after it, and records anything that comes."
+status = "bench"
+trace = "2026-11-25-sound-on.trace"
+note = "Said of Command 6. A host listens briefly after it, and records anything that comes. In this trace nothing came in the 300 ms the script that recorded it listened after s{6,4}, and the next reply began with {."
 
 [system_setup.sound_off]
 value = 3
@@ -335,8 +355,9 @@ value = 4
 source = "trm"
 page = 44
 evidence = "3 Turn sound off 4 Turn sound on"
-status = "manual"
-note = "The value of Command 6's first parameter, syssetup, that turns the unit's sound on."
+status = "bench"
+trace = "2026-11-25-sound-on.trace"
+note = "The value of Command 6's first parameter, syssetup, that turns the unit's sound on. In this trace s{6,4} took the piezo flag from 0 to 1. What the flag changes in the unit's sounds is not shown: see status.piezo_off."
 
 [command.open]
 value = "{"
@@ -344,7 +365,7 @@ source = "trm"
 page = 29
 evidence = "Every command must be enclosed in curly brackets, “{“ and “}”."
 status = "manual"
-note = "The evidence keeps the page's quotation marks as printed, with an opening mark on both sides of the {."
+note = "The evidence keeps the page's quotation marks as printed, with an opening mark on both sides of the {. Every command sent in the 2026-11-25 session was in braces, as in 2026-11-25-first-contact.trace, so braces are accepted. Whether the unit needs them is untested."
 
 [command.close]
 value = "}"
@@ -352,22 +373,25 @@ source = "trm"
 page = 29
 evidence = "Every command must be enclosed in curly brackets, “{“ and “}”."
 status = "manual"
+note = "Every command sent in the 2026-11-25 session was in braces, as in 2026-11-25-first-contact.trace, so braces are accepted. Whether the unit needs them is untested."
 
 [command.separator]
 value = ","
 source = "trm"
 page = 29
 evidence = "The command # and the option parameters are comma delimited."
-status = "manual"
-note = "Said of commands. Page 46's example shows a reply in the same braces and commas; that replies always take this form is the lead's reading, for the bench to show."
+status = "bench"
+trace = "2026-11-25-ch1-volt.trace"
+note = "Said of commands. In this trace s{1,1,14} was taken with error 0, and in 2026-11-25-ch1-volt-opfirst.trace s{1,14,1} drew error 12, so the unit reads the fields in order. Every reply of the 2026-11-25 session came in braces, and the 41 replies to Command 7 had their 17 values separated by commas, as page 46's example shows a reply."
 
 [reply.terminator]
 value = "\r"
 source = "trm"
 page = 23
 evidence = "In ASCII mode, looking for a carriage return character can do this."
-status = "manual"
-note = "Said of USB: a reader knows an ASCII reply has ended at its carriage return. Whether a line feed follows it is for the bench to show."
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
+note = "Said of USB: a reader knows an ASCII reply has ended at its carriage return. A line feed followed it in every reply of the 2026-11-25 session, 71 of 71, this trace's among them."
 
 # Data
 
@@ -399,7 +423,9 @@ value = "sm.dddddEsee"
 source = "trm"
 page = 21
 evidence = "in the format of sm.dddddEsee"
-status = "manual"
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
+note = "All 727 values in the replies of the 2026-11-25 session had this form, such as +6.06270E+00 in this trace. In 2026-11-25-ch1-0v.trace, -2.19784E-02 shows both signs negative."
 
 [data.binary_sample_bits]
 value = 16
@@ -438,14 +464,16 @@ value = 17
 source = "trm"
 page = 45
 evidence = "17 status registers"
-status = "manual"
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
 
 [status.check_value]
 value = 8888
 source = "trm"
 page = 45
 evidence = "8888 Constant value."
-status = "manual"
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
 
 [status.software_id_position]
 value = 1
@@ -453,8 +481,9 @@ unit = "place in the reply, counting from 1"
 source = "trm"
 page = 45
 evidence = "softwareID Current software ID in format: X.MMmms"
-status = "manual"
-note = "Page 45's table does not number its rows. The place is the row's, counted by the lead, and page 46's example reply begins with a value of that form."
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
+note = "Page 45's table does not number its rows. The place is the row's, counted by the lead, and page 46's example reply begins with a value of that form. Place 1 held +6.06270E+00 in all 41 replies to Command 7 of the 2026-11-25 session. This trace's device descriptor has bcdDevice 0x061B, whose 06 and 0x1B, 27, match the 06 and 27 of 6.0627 (INFERRED)."
 
 [status.check_value_position]
 value = 4
@@ -462,7 +491,8 @@ unit = "place in the reply, counting from 1"
 source = "trm"
 page = 45
 evidence = "8888 Constant value."
-status = "manual"
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
 note = "Page 45's table does not number its rows. The place is the row's, counted by the lead, and page 46's example reply has 8888 fourth."
 
 [status.error_position]
@@ -471,8 +501,9 @@ unit = "place in the reply, counting from 1"
 source = "trm"
 page = 45
 evidence = "error If non-zero, LabPro should be reset and the cause of the error corrected."
-status = "manual"
-note = "Page 45's table does not number its rows. The place is the row's, counted by the lead."
+status = "bench"
+trace = "2026-11-25-ch1-volt-opfirst.trace"
+note = "Page 45's table does not number its rows. The place is the row's, counted by the lead. In this trace place 2 read 0 before s{1,14,1}, and 12 after it."
 
 [status.system_state_position]
 value = 14
@@ -480,8 +511,9 @@ unit = "place in the reply, counting from 1"
 source = "trm"
 page = 45
 evidence = "system state The following values are used for the system state:"
-status = "manual"
-note = "Page 45's table does not number its rows. The place is the row's, counted by the lead, and page 46's example reply has 1, idle, fourteenth."
+status = "bench"
+trace = "2026-11-25-qs-after.trace"
+note = "Page 45's table does not number its rows. The place is the row's, counted by the lead, and page 46's example reply has 1, idle, fourteenth. In this trace place 14 read 17 after one press of the Quick Setup button, where 2026-11-25-qs-before.trace read 1. The press is in no trace: it is the owner's word."
 
 [status.piezo_flag_position]
 value = 13
@@ -489,8 +521,9 @@ unit = "place in the reply, counting from 1"
 source = "trm"
 page = 45
 evidence = "piezo flag This is the buzz/no-buzz value that was last commanded."
-status = "manual"
-note = "Page 45's table does not number its rows. The place is the row's, counted by the lead: the row just before the system state's."
+status = "bench"
+trace = "2026-11-25-sound-on.trace"
+note = "Page 45's table does not number its rows. The place is the row's, counted by the lead: the row just before the system state's. In this trace place 13 read 0, then 1 after s{6,4}."
 
 [status.piezo_off]
 value = 0
@@ -498,20 +531,25 @@ source = "trm"
 page = 45
 evidence = "0 Sound is disabled (OFF)"
 status = "manual"
+note = "Consistent with the session's recordings: the flag read 0 at the first reply to Command 7 of each one made after a power-up or power-cycle, by the owner's account (2026-11-25-first-contact.trace, the three sound-on recordings and 2026-11-25-qs-after-cycle.trace), and 0 after a reset (2026-11-25-ch1-volt.trace). But with it at 0 an error still beeped three times, by the owner's account (2026-11-25-ch1-volt-opfirst.trace), and system_setup.sound_off was never sent. So that 0 means the sound is off is not shown."
 
 [status.piezo_on]
 value = 1
 source = "trm"
 page = 45
 evidence = "1 Sound is enabled (ON)"
-status = "manual"
+status = "bench"
+trace = "2026-11-25-sound-on.trace"
+note = "In this trace the piezo flag read 1 after s{6,4}, the value last commanded. What the flag changes in the unit's sounds is not shown: see status.piezo_off."
 
 [status.state_idle]
 value = 1
 source = "trm"
 page = 45
 evidence = "1 Idle 2 Armed 3 Busy 4 Done 5 Self-test 99 Initializing code"
-status = "manual"
+status = "bench"
+trace = "2026-11-25-first-contact.trace"
+note = "In this trace, the session's first recording, place 14 read 1. No recording of the session sends Command 3, which sets up a collection, and place 14 read 1 in 40 of its 41 replies to Command 7; the other, in 2026-11-25-qs-after.trace, read 17."
 
 [status.state_armed]
 value = 2
@@ -554,7 +592,9 @@ unit = "added to the system state"
 source = "trm"
 page = 45
 evidence = "Add 16 to the value if the last mode was QuickSetup."
-status = "manual"
+status = "bench"
+trace = "2026-11-25-qs-after.trace"
+note = "In this trace the system state read 17, which is 1 + 16, after one press of the Quick Setup button. 2026-11-25-qs-before.trace, just before the press, read 1. The press is in no trace: it is the owner's word."
 
 [status.unretrieved_data_flag]
 value = 32
@@ -615,7 +655,7 @@ source = "trm"
 page = 31
 evidence = "Analog channels 1 through 4"
 status = "manual"
-note = "The port labelled CH1 (page 6) is channel number 1."
+note = "The port labelled CH1 (page 6) is channel number 1. Consistent with 2026-11-25-ch1-9v.trace, where channel 1 read +9.29670E+00, but no trace records the port: that the probe was in CH1, on a 9 V battery, is the owner's word."
 
 # Command 1's channel numbers: one fact for each row of page 31's table. A value
 # is the row's numbers: one number, two joined by a comma, or a first and a last
@@ -636,6 +676,7 @@ source = "trm"
 page = 31
 evidence = "Analog channels 1 through 4"
 status = "manual"
+note = "Consistent with 2026-11-25-ch1-volt-opfirst.trace, where s{1,14,1} drew error 12, which the manual's table of error codes gives for a channel that does not exist. Only channel 1 was used, so channels 2 to 4 are not shown."
 
 [channel.numbers_sonic]
 value = "11, 12"
@@ -664,6 +705,7 @@ source = "trm"
 page = 31
 evidence = "1 Auto-ID the sensor"
 status = "manual"
+note = "Consistent with 2026-11-25-ch1-9v.trace: s{1,1,1} was taken, and CH1 then read +9.29670E+00 to +9.31624E+00, on a 9 V battery by the owner's account. That the unit identified the probe is INFERRED."
 
 [channel.operation_voltage_0_5]
 value = 14
@@ -671,6 +713,7 @@ source = "trm"
 page = 31
 evidence = "14 Voltage, 0-5V"
 status = "manual"
+note = "Consistent with 2026-11-25-ch1-volt.trace: s{1,1,14} was taken, with error 0. CH1 then read +2.69109E+00, with nothing known on its input, so the 0 to 5 V range is not shown."
 
 [channel_data.mode_retest]
 value = 0
@@ -678,6 +721,7 @@ source = "trm"
 page = 48
 evidence = "0 Re-tests the channel for AutoID value"
 status = "manual"
+note = "Consistent with 2026-11-25-ch1-0v.trace: with the probe's clips together, by the owner's account, s{9,1,0} drew -2.19784E-02. What the mode does is not shown."
 
 [channel_data.mode_stored]
 value = 1
@@ -685,3 +729,4 @@ source = "trm"
 page = 48
 evidence = "1 returns the stored AutoID value"
 status = "manual"
+note = "Consistent with 2026-11-25-ch1-0v.trace: with the probe's clips together, by the owner's account, s{9,1,1} drew -1.70937E-02. What the mode does is not shown."

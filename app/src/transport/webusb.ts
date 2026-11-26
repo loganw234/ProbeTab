@@ -1,5 +1,6 @@
 // The WebUSB transport: a stock LabPro on the computer's own USB port, from Chrome or Edge.
-// It is written before any LabPro has been connected, and is first exercised at Phase 0.
+// It was written before any LabPro had been connected, and first reached one on 2026-11-25, in
+// Chrome 158 on Windows.
 // Its tests run it against a simulated device, not against a browser.
 //
 // TypeScript's DOM library does not declare WebUSB, so this file declares the parts it uses,

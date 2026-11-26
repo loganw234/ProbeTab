@@ -1,7 +1,7 @@
 // The bench page's glue to the browser: its buttons, its log and its record. The steps are
 // in session.ts and the evidence in record.ts, which the tests run on Node. This file is not
 // tested on Node. The rehearsal (bench/rehearse.html) runs it in a browser against a simulated
-// LabPro; against a LabPro, it first runs at Phase 0.
+// LabPro; against a LabPro, it first ran on 2026-11-25, in Chrome 158 on Windows.
 
 import { count } from "../protocol/facts.ts";
 import { FORMS, type Form } from "../protocol/status.ts";

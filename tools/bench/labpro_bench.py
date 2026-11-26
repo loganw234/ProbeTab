@@ -36,7 +36,8 @@ tools/traces.py says: model information only.
     Command 7, whose error register must be 0.
 --operation is auto-id (the default) or voltage, the 0 to 5 V operation. --order
 is channel-first (the default, as page 31 writes Command 1) or operation-first.
-Both only change what Command 1 sends: the unit's answer is for the bench.
+Both only change what Command 1 sends. On 2026-11-25 the unit took the channel
+first (protocol/REFERENCE.md, question 5).
 --applied and --meter are the voltage set on the supply and, if a meter is used,
 the meter's reading, each a plain number of volts: an optional minus sign, digits,
 and optionally a point and more digits, at most NUMBER_LENGTH characters. They are
@@ -67,8 +68,9 @@ when stopped by Ctrl-C, or by an error it does not name, which then goes on
 with its traceback. When no transfer was made, there is no trace to write.
 
 FORM is how every command is framed. The manual writes s{7} for a computer
-host, and a carriage return after each command on the serial port. Whether USB
-wants either is the first thing the bench has to settle:
+host, and a carriage return after each command on the serial port. Over USB,
+on 2026-11-25, Command 7 was answered only with both (protocol/REFERENCE.md,
+question 1):
 
     s-cr   s{7} and the carriage return (the default)
     s      s{7} alone

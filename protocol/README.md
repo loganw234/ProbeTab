@@ -18,6 +18,9 @@ state it, and a status:
 - `manual`: read from the source and not yet seen on a bench;
 - `bench`: confirmed on a LabPro, with `trace` naming the recorded trace.
 
+Every `bench` fact so far rests on one session, on 2026-11-25, with one LabPro
+and one Windows computer.
+
 `python tools/check.py` does two things with this file:
 
 - It holds every fact to that shape.
@@ -31,15 +34,16 @@ reader's check.
 Vernier's LabPro Technical Reference Manual, revision dated 08/02/02.
 
 - The copy cited is pinned by size and SHA-256 in labpro-facts.toml.
-- Page numbers are the PDF's own. On every page cited so far they match the
-  manual's printed numbers.
+- Page numbers are the PDF's own. On every page the facts file cites they
+  match the manual's printed numbers. Appendix B is numbered apart: the PDF's
+  pages 79 and 80 are printed B-1 and B-2.
 - The manual is not in this repository and is not to be added.
 
 ## traces/ and fixtures/
 
 - [traces/](traces/FORMAT.md) holds recordings of real bench sessions, each
   pinned by its SHA-256 in `traces/SHA256SUMS`. A fact becomes `bench` only by
-  naming one. There are none yet.
+  naming one. The first 16 came from the session of 2026-11-25.
 - [fixtures/](fixtures/README.md) holds hand-written traces, the lead's model of
   the device, for tests. They are not evidence.
 - [traces/FORMAT.md](traces/FORMAT.md) describes the format.
@@ -51,11 +55,12 @@ Vernier's LabPro Technical Reference Manual, revision dated 08/02/02.
 this project's own words. It also lists:
 
 - where the manual disagrees with itself;
-- what only the bench can settle.
+- what only the bench can settle, and what it has settled so far.
 
 ## Still to come
 
-The bench's answers: recorded traces, and the facts they move to `bench`.
+The rest of the bench's answers: REFERENCE.md's questions 3, 4 and 6, a
+session on a Mac, and recordings for the facts still `manual`.
 
 ## Licence
 

@@ -1,8 +1,12 @@
 # The LabPro protocol, as far as Phase 0 needs it
 
-**Source.** Vernier's LabPro Technical Reference Manual, revision 08/02/02. It
-was read before any LabPro had been connected, so nothing on this page has been
-seen on a bench yet.
+**Source.** Vernier's LabPro Technical Reference Manual, revision 08/02/02. This
+page was written from it before any LabPro had been connected, and it stays the
+manual's account. The first bench session, on 2026-11-25, answered some of the
+questions the manual leaves. Those answers are in the last section and under
+"Channel and operation swapped", each linking the recordings in
+[traces/](traces/FORMAT.md) that show it. Which facts a recording shows is in
+the facts file's statuses.
 
 **Pages.** Each section cites the manual's pages. The values Phase 0's code
 uses are also facts in [labpro-facts.toml](labpro-facts.toml), where the gate
@@ -41,8 +45,8 @@ Pages 6, 7 and 30.
   command (page 22).
   - The manual says USB works much like the serial port, in ASCII, but never
     shows a USB exchange byte for byte.
-  - Whether USB wants the `s` and the carriage return is the first thing the
-    bench has to answer.
+  - Whether USB wants the `s` and the carriage return was the first thing the
+    bench had to answer. Question 1, in the last section, gives the answer.
 - **What comes back.** The LabPro answers commands in ASCII text, and sends
   collected data as ASCII or binary, whichever the host chose (pages 21 and 22).
   - In ASCII, a number has the form `sm.dddddEsee`: a sign, a digit, five
@@ -262,7 +266,12 @@ Each is a question for the bench, not something to code around.
   - Command 1's syntax (page 31) and the examples on pages 22, 43, 50 and 52
     to 55 put the channel first, as `s{1,1,14}`; pages 43, 50 and 52 add
     trailing zeros.
-  - Which order a unit takes is for the bench.
+  - **The bench's answer: channel first.** On 2026-11-25 the unit took
+    `s{1,1,14}` with error 0 ([ch1-volt](traces/2026-11-25-ch1-volt.trace)),
+    and `s{1,14,1}` drew error 12
+    ([ch1-volt-opfirst](traces/2026-11-25-ch1-volt-opfirst.trace)). The
+    manual's table of error codes gives 12 for a channel that does not exist
+    (the PDF's page 80, printed B-2).
 - **A copied column.** In Example 2 on page 40, the calculator column repeats
   Example 1's commands beside a different sequence.
 - **Sixteen bits or sixteen bytes.** Page 23 says a real-time sample comes back
@@ -272,17 +281,62 @@ Each is a question for the bench, not something to code around.
 
 ## What Phase 0 has to settle
 
+The first bench session, on 2026-11-25, answered four of these. Each answer
+rests on that one session, with one unit and one host: Windows 11 with libusb
+1.0.30, and Chrome 158 for the browser's recording, whose header gives the
+version Chrome reports for that computer, `Windows 15.0.0`. Every command in it
+was framed with the `s` and a carriage return, except in question 1's tests.
+
 1. Whether a USB command needs the leading `s`, the closing carriage return, or
    both.
+   - **Both, for Command 7.** `s{7}` and a carriage return drew the reply
+     ([first-contact](traces/2026-11-25-first-contact.trace)). `s{7}` alone
+     ([form-s](traces/2026-11-25-form-s.trace)), `{7}` and a carriage return
+     ([form-cr](traces/2026-11-25-form-cr.trace)), and `{7}` alone
+     ([form-bare](traces/2026-11-25-form-bare.trace)) each drew nothing within
+     the bench script's 2000 ms.
 2. The bytes Command 7 returns over USB, including how its reply sits in 64-byte
    packets, and the unit's software ID.
+   - **Seventeen values in braces, then a carriage return and a line feed:**
+     `{  +6.06270E+00, +0.00000E+00, … +0.00000E+00 }`. They came in four 64-byte
+     packets, the last padded with zero bytes after the line feed
+     ([first-contact](traces/2026-11-25-first-contact.trace)). Place 1, the
+     software ID by page 45's row order, held `+6.06270E+00` in all 41 replies
+     to Command 7.
+     The device descriptor's bcdDevice, 0x061B, fits its 06 and 27 (INFERRED).
 3. Whether binary-mode samples arrive as raw bytes or as hexadecimal text.
+   - **Not reached.** No command of the session asked for binary mode.
 4. What Command 9's value is. Page 48 calls it the sensor's current value; the
    bench settles whether that is a reading in the sensor's units or a raw
    voltage, with known voltages from a bench supply.
+   - **Not settled.** The owner's probe, which the owner believes is a voltage
+     probe, was on the port the owner names as CH1, and Command 1 set it up
+     with operation 1. What the probe was put on, and when its contact held or
+     slipped, are the owner's account; the recordings hold only the readings.
+     CH1 read:
+     - about -0.02 with the probe's clips together, at 0 V
+       ([ch1-0v](traces/2026-11-25-ch1-0v.trace));
+     - +1.585 to +1.595 while the contact held on an AA cell. In the same
+       recording, readings near 0, and one of +1.238, came when it slipped
+       ([ch1-aa-2](traces/2026-11-25-ch1-aa-2.trace));
+     - +9.297 to +9.316 on a 9 V battery
+       ([ch1-9v](traces/2026-11-25-ch1-9v.trace)).
+
+     Those are near the cells' nominal voltages, but neither cell was metered.
+     A sensor that reads in other units, and a metered source, are still
+     needed.
 5. Which order of channel and operation Command 1 takes.
+   - **Channel first.** `s{1,1,14}` drew error 0
+     ([ch1-volt](traces/2026-11-25-ch1-volt.trace)), and `s{1,14,1}` drew error
+     12 ([ch1-volt-opfirst](traces/2026-11-25-ch1-volt-opfirst.trace)), which
+     the manual's table of error codes gives for a channel that does not exist
+     (the PDF's page 80, printed B-2).
 6. How fast real-time samples arrive over USB on the hosts that matter.
+   - **Not reached.** No real-time run was started.
 7. How a reply ends: whether a line feed follows its carriage return.
+   - **Yes.** Every reply of the session, 71 of 71, ended with `}`, a carriage
+     return and a line feed
+     ([first-contact](traces/2026-11-25-first-contact.trace) and the rest).
 
 Licence: the folder table in [the README](../README.md) gives this file's
 licence.

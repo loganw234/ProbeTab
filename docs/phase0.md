@@ -1,7 +1,9 @@
 # Phase 0: first contact with a LabPro
 
 The runbook for the first sessions with a LabPro, on the MacBook. Each step
-says what to run, what to watch for, and what to keep.
+says what to run, what to watch for, and what to keep. The first session ran
+on a Windows computer instead, on 2026-11-25; the section on Windows says what
+that needed.
 
 [phase0-evidence.md](phase0-evidence.md) is a map of which facts each step's
 trace can settle.
@@ -10,7 +12,9 @@ A reading that looks right is not evidence that it is right. What counts is
 the trace each step writes, kept as the last section says.
 
 **Every expected outcome about the unit below is BELIEVED,** from the manual
-and the code, until a trace shows it. No LabPro has been connected yet.
+and the code, until a trace shows it. What the first session, on 2026-11-25,
+showed is in [protocol/REFERENCE.md](../protocol/REFERENCE.md), and the facts'
+statuses say which facts its recordings show.
 
 ## Before the LabPro is plugged in
 
@@ -237,8 +241,9 @@ Page 26 says pressing the Quick Setup button wipes the unit's stored data and
 its setup, and page 45 says the system state's register adds the QuickSetup
 flag if the last mode was QuickSetup. This step shows whether a press moves
 that register. It is last, and ends with a power-cycle, because what a press
-leaves the unit in is unknown until the bench. Skip it if anything above went
-wrong.
+leaves the unit in was unknown before the bench. On 2026-11-25, after a press
+alone by the owner's account, the flag was set and the unit stayed idle, as
+the end of this step says. Skip it if anything above went wrong.
 
 1. **Before.** Run step 1's command, without `--descriptors`, so that it sends
    Command 7 and nothing else, into a trace of its own:
@@ -270,9 +275,14 @@ wrong.
 QuickSetup flag in the first trace, and the same code plus the flag in the
 second. Other registers, such as the last run's setup, may change too.
 
-**Not known until the bench:** whether the press alone sets the flag, or only a
-run started after it, and what state it leaves the unit in. If the two traces
-show the same state register, that is the finding.
+**What the session found, on 2026-11-25:** the press alone set the flag, and
+left the unit idle. The system state read 1 before the press
+([qs-before](../protocol/traces/2026-11-25-qs-before.trace)) and 17, idle plus
+the QuickSetup flag, after it
+([qs-after](../protocol/traces/2026-11-25-qs-after.trace)). No other register
+changed. After a power-cycle it read 1 again
+([qs-after-cycle](../protocol/traces/2026-11-25-qs-after-cycle.trace)). The
+press and the power-cycle are in no trace: they are the owner's word.
 
 ## Keeping the evidence
 
@@ -305,8 +315,9 @@ works on firmware 6.022 or newer.
 - **Page 79 does not say what this reset clears.** Treat it as clearing the
   data buffer, as a reset command does (page 26).
 - **Command 7's first register is the software ID,** written `X.MMmms`, which a
-  trace records as its `firmware`. How page 79's "6.022" reads against that
-  form is for the bench to show.
+  trace records as its `firmware`. The unit on the bench on 2026-11-25 gave
+  `+6.06270E+00` ([first-contact](../protocol/traces/2026-11-25-first-contact.trace)).
+  How page 79's "6.022" reads against that form is still the reader's call.
 
 ## A Chromebook, later
 
@@ -319,11 +330,14 @@ Both are checked then.
 
 ## Windows
 
-The Mac is Phase 0's host.
+The Mac was planned as Phase 0's host. The first session ran on a Windows
+computer instead, on 2026-11-25, on the owner's word.
 - **On Windows, the bench script needs the WinUSB driver bound to the
   LabPro,** as [tools/bench/README.md](../tools/bench/README.md) says.
 - **A browser may need it too,** as [app/README.md](../app/README.md) says.
-  That is measured when Windows is.
+  With WinUSB bound, Chrome 158 reached the LabPro on 2026-11-25
+  ([browser](../protocol/traces/2026-11-25-browser.trace)). Without it, a
+  browser was not tried.
 - **Binding the driver changes the machine's drivers.** It is the owner's to
   make, apart from this runbook.
 

@@ -1341,6 +1341,9 @@ def edit(root, name, pattern, replacement, within):
 
 
 FACT = "[usb.vendor_id]"
+# The controls that edit a fact's status need a fact that stays manual: a USB session does not
+# reach the serial port's checksum.
+STATUS_FACT = "[data.checksum]"
 
 
 def plant_unlisted_folder(root, files, ctx):
@@ -1494,7 +1497,7 @@ def plant_wrong_page(root, files, ctx):
 
 
 def plant_bench_without_trace(root, files, ctx):
-    edit(root, FACTS, r'status = "manual"', 'status = "bench"', within=FACT)
+    edit(root, FACTS, r'status = "manual"', 'status = "bench"', within=STATUS_FACT)
     return files
 
 
@@ -1581,23 +1584,23 @@ def plant_hand_edited_generated(root, files, ctx):
 
 def plant_bench_fact_on_fixture(root, files, ctx):
     edit(root, FACTS, r'status = "manual"', 'status = "bench"\ntrace = "../fixtures/status-request.trace"',
-         within=FACT)
+         within=STATUS_FACT)
     return files
 
 
 def plant_bench_fact_on_missing_name(root, files, ctx):
-    edit(root, FACTS, r'status = "manual"', 'status = "bench"\ntrace = "nonexistent.trace"', within=FACT)
+    edit(root, FACTS, r'status = "manual"', 'status = "bench"\ntrace = "nonexistent.trace"', within=STATUS_FACT)
     return files
 
 
 def plant_bench_fact_on_fixture_name(root, files, ctx):
-    edit(root, FACTS, r'status = "manual"', 'status = "bench"\ntrace = "status-request.trace"', within=FACT)
+    edit(root, FACTS, r'status = "manual"', 'status = "bench"\ntrace = "status-request.trace"', within=STATUS_FACT)
     return files
 
 
 def plant_bench_fact_on_unlisted(root, files, ctx):
     name = plant_recording(root, "unlisted.trace", listed=False)
-    edit(root, FACTS, r'status = "manual"', f'status = "bench"\ntrace = "{name}"', within=FACT)
+    edit(root, FACTS, r'status = "manual"', f'status = "bench"\ntrace = "{name}"', within=STATUS_FACT)
     return walked_files(root)
 
 
@@ -1605,7 +1608,7 @@ def plant_bench_fact_on_changed(root, files, ctx):
     name = plant_recording(root)
     path = root / TRACES / name
     path.write_bytes(path.read_bytes().replace(b" 0d\n", b" 0a\n", 1))
-    edit(root, FACTS, r'status = "manual"', f'status = "bench"\ntrace = "{name}"', within=FACT)
+    edit(root, FACTS, r'status = "manual"', f'status = "bench"\ntrace = "{name}"', within=STATUS_FACT)
     return walked_files(root)
 
 
@@ -1692,7 +1695,7 @@ def plant_utf16_run(root, files, ctx):
 def plant_evidence_line_in_a_note(root, files, ctx):
     words = words_of(manual_page(root, ctx, 22))[40:63]
     edit(root, FACTS, r'status = "manual"',
-         'status = "manual"\nnote = """\nevidence = \'' + " ".join(words) + '\'\n"""', within=FACT)
+         'status = "manual"\nnote = """\nevidence = \'' + " ".join(words) + '\'\n"""', within=STATUS_FACT)
     return files
 
 
@@ -1993,7 +1996,7 @@ CONTROLS = [
     ("facts", "evidence too short to place", plant_short_evidence, "usb.vendor_id: its evidence is too short"),
     ("facts", "evidence too long to be a phrase", plant_long_evidence, "usb.vendor_id: its evidence is longer"),
     ("facts", "evidence cited to the wrong page", plant_wrong_page, "usb.vendor_id: its evidence is not on page 23"),
-    ("facts", "a bench fact with no trace", plant_bench_without_trace, "usb.vendor_id: a bench fact"),
+    ("facts", "a bench fact with no trace", plant_bench_without_trace, "data.checksum: a bench fact"),
     ("facts", "a source not listed", plant_unlisted_source, "usb.vendor_id: its source 'planted'"),
     ("facts", "a bench fact on a fixture", plant_bench_fact_on_fixture,
      "'../fixtures/status-request.trace' is not one"),
@@ -2271,7 +2274,7 @@ def build_bench_fact_on_recording(base, ctx):
     """A bench fact naming a sound, listed recording: the bench rule must let it pass."""
     root = copy_files(ctx.files, base / "bench-recording")
     name = plant_recording(root)
-    edit(root, FACTS, r'status = "manual"', f'status = "bench"\ntrace = "{name}"', within=FACT)
+    edit(root, FACTS, r'status = "manual"', f'status = "bench"\ntrace = "{name}"', within=STATUS_FACT)
     return check_facts(root, walked_files(root), ctx)
 
 
@@ -2279,7 +2282,7 @@ BUILT_CONTROLS = [
     ("generated", "a generator that writes a wrong value consistently", build_generated_mutant, "fail",
      "round trip: usb.vendor_id loads"),
     ("facts", "a bench fact on a sound, listed recording", build_bench_fact_on_recording, "clean",
-     "usb.vendor_id"),
+     "data.checksum"),
     ("generated", "a generator that writes true for 1, consistently", build_generated_boolean_mutant, "fail",
      "round trip: usb.product_id loads"),
     ("traces", "traces.write given a value holding a line break", build_write_refusals, "fail",

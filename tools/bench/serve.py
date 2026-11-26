@@ -8,8 +8,9 @@ rehearsal (rehearse.html), collect/, the classroom screen, and web/,
 the JavaScript that tsc builds from app/src/ (app/README.md says how to build
 it). It binds to 127.0.0.1, so no other computer can reach it. Open
 http://127.0.0.1:N/bench/ (or /collect/) in Chrome or Edge: WebUSB needs a secure origin, and
-Chromium counts 127.0.0.1 as one (BELIEVED, from Chromium's behaviour; Phase 0
-shows it).
+Chromium counts 127.0.0.1 as one (BELIEVED, from Chromium's behaviour). It was
+seen once: on 2026-11-25, Chrome 158 on Windows used WebUSB from the page served
+here, by the lead's record of this script's log.
 
 Each file's type comes from its extension, by this script's own table, never
 the system's: Windows' registry can make .js plain text (BELIEVED), and a

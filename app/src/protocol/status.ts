@@ -8,8 +8,8 @@ import { TransportTimeout, type Transport } from "../transport/transport.ts";
 
 /**
  * How a command is framed. The manual writes s{7} for a computer host, and a carriage
- * return after each command on the serial port; whether USB wants either is the first thing
- * the bench has to settle.
+ * return after each command on the serial port. Over USB, on 2026-11-25, Command 7 was
+ * answered only with both (protocol/REFERENCE.md, question 1).
  */
 export const FORMS = ["s-cr", "s", "cr", "bare"] as const;
 export type Form = (typeof FORMS)[number];
