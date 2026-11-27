@@ -3,7 +3,8 @@
 The runbook for the first sessions with a LabPro, on the MacBook. Each step
 says what to run, what to watch for, and what to keep. The first session ran
 on a Windows computer instead, on 2026-11-25; the section on Windows says what
-that needed.
+that needed. A second ran on the MacBook on 2026-11-27: the lead ran the bench
+script over SSH, and the owner ran the browser page.
 
 [phase0-evidence.md](phase0-evidence.md) is a map of which facts each step's
 trace can settle.
@@ -34,6 +35,8 @@ On the MacBook, from the repository's root, at the latest `main`:
    commands are the ones the desktop used; these are their Mac form. On
    2026-11-19 the owner's MacBook had such an environment: the gate's bench
    check ran with `.venv/bin/python` and pyusb 1.3.1, by the owner's report.
+   On 2026-11-27 that environment reached the LabPro
+   ([mac-first-contact](../protocol/traces/2026-11-27-mac-first-contact.trace)).
 4. **Node 22.19 or later,** from `brew install node` if `node --version` gives
    an older one (BELIEVED to be new enough). Then, for typescript, in `app/`,
    run `npm ci --ignore-scripts`.
@@ -214,9 +217,18 @@ Put the battery and its resistor across the probe, then take a live reading:
     caffeinate -i .venv/bin/python tools/bench/labpro_bench.py --out 2026-11-20-drain.trace --read-ch1 --form FRAMING --every 10 --for 3600
 
 - Choose the interval and the length to suit the battery.
+- The load must draw enough to show in an hour. A resistor of tens of
+  kilohms draws microamps, and the reading will not move: 1.5 V across 50 kΩ
+  is 30 µA (COMPUTED).
 - `caffeinate -i` keeps the Mac from sleeping while the run lasts (BELIEVED).
   Keep its lid open.
 - Ctrl-C stops the run early, and the trace keeps the transfers made so far.
+- **Run on 2026-11-27** on the MacBook, every 10 s for 3,600 s, with a small
+  3 V vibration motor across the AA as the load, by the owner's account
+  ([drain-motor](../protocol/traces/2026-11-27-drain-motor.trace)).
+  - CH1 fell from +1.57509 V to +1.54579 V, about 24 mV in 10-minute means.
+  - The error register read 0, and the unit idle, in all 39 status replies.
+  - No meter reading was taken.
 
 ### 5. The browser page
 
@@ -235,6 +247,12 @@ Put the battery and its resistor across the probe, then take a live reading:
 
 **Use the page when no bench script run is under way.** A run ends when the
 script exits, so a finished run holds nothing.
+
+**Run on 2026-11-27** on the MacBook: Chrome 157 reached the LabPro with no
+driver installed, by the owner's account. Its live reading took 22 readings,
+about 1.4 s apart. The first 15 read -0.09 to +0.80 V. The last 7 read
++1.60928 to +1.61416 V, after the probe went onto an AA cell (INFERRED from the
+step) ([mac-browser-live](../protocol/traces/2026-11-27-mac-browser-live.trace)).
 
 ### 6. The Quick Setup check (optional, and last)
 

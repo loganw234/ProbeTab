@@ -332,9 +332,17 @@ was framed with the `s` and a carriage return, except in question 1's tests.
      - +9.297 to +9.316 on a 9 V battery
        ([ch1-9v](traces/2026-11-25-ch1-9v.trace)).
 
-     Those are near the cells' nominal voltages, but neither cell was metered.
-     A sensor that reads in other units, and a metered source, are still
-     needed.
+     On 2026-11-27, on a MacBook, with the setups again the owner's account,
+     CH1 read:
+     - +1.60928 to +1.61416 on an AA cell, in the bench page's live reading
+       ([mac-browser-live](traces/2026-11-27-mac-browser-live.trace));
+     - from +1.57509 down to +1.54579 over an hour, with a small motor across
+       the cell as its load
+       ([drain-motor](traces/2026-11-27-drain-motor.trace)).
+
+     Those are near the cells' nominal voltages, and the loaded cell's reading
+     fell over the hour, but no cell was metered. A sensor that reads in other
+     units, and a metered source, are still needed.
 5. Which order of channel and operation Command 1 takes.
    - **Channel first.** `s{1,1,14}` drew error 0
      ([ch1-volt](traces/2026-11-25-ch1-volt.trace)), and `s{1,14,1}` drew error

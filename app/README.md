@@ -26,6 +26,9 @@ page runs a build of them, which tsc makes (see [The bench page](#the-bench-page
   - It clears a stalled endpoint's halt before it refuses the transfer.
   - It first reached a LabPro on 2026-11-25, in Chrome 158 on Windows with
     WinUSB bound ([the recording](../protocol/traces/2026-11-25-browser.trace)).
+    On 2026-11-27 it reached one in Chrome 157 on macOS, with no driver
+    installed by the owner's account
+    ([the recording](../protocol/traces/2026-11-27-mac-browser-live.trace)).
 - [src/protocol/status.ts](src/protocol/status.ts): the commands the bench
   script sends, and their replies, through any transport. These are Command 7,
   Command 0, Command 1 and Command 9, and the system state decoded as page 45
@@ -223,15 +226,20 @@ here. Those settings, and the domain's DNS records, are the owner's.
   - Its glue to the page, `page.ts`, is not. The rehearsal ran it in a browser
     on 2026-11-18, by hand, against the simulated LabPro (MEASURED). Against a
     LabPro, it first ran on 2026-11-25, in Chrome 158 on Windows
-    ([the recording](../protocol/traces/2026-11-25-browser.trace)).
+    ([the recording](../protocol/traces/2026-11-25-browser.trace)), and on
+    2026-11-27 in Chrome 157 on macOS
+    ([the recording](../protocol/traces/2026-11-27-mac-browser-live.trace)).
 - **The WebUSB declarations in `webusb.ts`, and the client-hint declarations in
   `record.ts`, are this project's own.** TypeScript's DOM library has neither.
   They are written from the lead's knowledge of the APIs, not checked against
-  their specifications here. A mistake in them would not be caught before
-  Phase 0.
+  their specifications here. They worked in Chrome 158 on Windows and Chrome
+  157 on macOS, in the recordings of 2026-11-25 and 2026-11-27. A mistake in a
+  part those runs did not use would still not be caught.
 - **On Windows, a browser may reach a stock LabPro only with the WinUSB driver
   bound to it.** The outline names this as a risk. With WinUSB bound, Chrome 158
-  reached the LabPro on 2026-11-25; without it, a browser was not tried.
+  reached the LabPro on 2026-11-25; without it, a browser was not tried. On
+  macOS, Chrome 157 reached it on 2026-11-27 with no driver installed, by the
+  owner's account.
 - **A school-managed Chromebook may block WebUSB.**
 - **The page's copies of the bench script's choices** are held to the script's
   by a bench test, `tools/bench/test_browser.py`:

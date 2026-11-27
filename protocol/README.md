@@ -45,7 +45,8 @@ Vernier's LabPro Technical Reference Manual, revision dated 08/02/02.
 
 - [traces/](traces/FORMAT.md) holds recordings of real bench sessions, each
   pinned by its SHA-256 in `traces/SHA256SUMS`. A fact becomes `bench` only by
-  naming one. The first 16 came from the session of 2026-11-25.
+  naming one. The first 16 came from the session of 2026-11-25, on Windows,
+  and three more from the session of 2026-11-27, on a MacBook.
 - [fixtures/](fixtures/README.md) holds hand-written traces, the lead's model of
   the device, for tests. They are not evidence.
 - [traces/FORMAT.md](traces/FORMAT.md) describes the format.
@@ -62,7 +63,7 @@ this project's own words. It also lists:
 ## Still to come
 
 The rest of the bench's answers: REFERENCE.md's questions 3, 4 and 6, a
-session on a Mac, and recordings for the facts still `manual`.
+session on a Chromebook, and recordings for the facts still `manual`.
 
 ## Licence
 

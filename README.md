@@ -5,14 +5,16 @@ sensor interface back into everyday use. It is one web app that collects data
 over the LabPro's own USB port, or through a small ESP32-S3 bridge over USB,
 Wi-Fi or Bluetooth, with nothing to install and no account.
 
-**Status, 2026-11-26: Phase 0, the first contact with a LabPro, is under way.**
-A LabPro was first connected on 2026-11-25, to a Windows computer. The bench
-script and the browser bench page both talked to it, and the session's 16
-recordings are in [protocol/traces/](protocol/traces/FORMAT.md). 30 of the 81
-facts about the LabPro are now marked `bench`, each naming the recording that
-shows it. The rest are read from Vernier's manual, and marked unverified until a
-LabPro confirms them. [docs/phase0.md](docs/phase0.md) is Phase 0's runbook;
-some of its steps, and a session on a Mac, are still to come.
+**Status, 2026-11-27: Phase 0, the first contact with a LabPro, is under way.**
+A LabPro was first connected on 2026-11-25, to a Windows computer, and on
+2026-11-27 to a MacBook. The bench script and the browser bench page talked to
+it on both. On the Mac, the page showed a live reading from it with no driver
+installed, by the owner's account. The sessions' 19 recordings are in
+[protocol/traces/](protocol/traces/FORMAT.md). 30 of the 81 facts about the
+LabPro are now marked `bench`, each naming the recording that shows it. The
+rest are read from Vernier's manual, and marked unverified until a LabPro
+confirms them. [docs/phase0.md](docs/phase0.md) is Phase 0's runbook; some of
+its steps are still to come.
 
 ## The authority
 

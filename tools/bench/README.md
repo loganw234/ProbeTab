@@ -63,7 +63,9 @@ Talking to a LabPro also needs libusb, the library pyusb reaches USB through:
   `--libusb`. On 2026-11-19, by the owner's reports, the bench script on the
   owner's MacBook found libusb by itself, with no `--libusb`: before the LabPro
   had arrived, it refused "no LabPro found". An earlier try there refused for
-  want of a USB backend, for a cause not reported.
+  want of a USB backend, for a cause not reported. On 2026-11-27 it reached
+  the LabPro there, through libusb 1.0.30
+  ([mac-first-contact](../../protocol/traces/2026-11-27-mac-first-contact.trace)).
 - **Linux:** the distribution's libusb-1.0.
 - **Windows:** libusb's DLL, and the WinUSB driver bound to the LabPro. That
   changes the machine's drivers, and the plan leaves it to the owner's hand.
@@ -210,9 +212,10 @@ The gate then holds it to the format and to its hash.
 
 - **The tests show agreement with the fake, not with a LabPro.** The fake is the
   lead's model of a LabPro, built from the facts and the fixtures.
-- **It has run against real hardware in one session:** a LabPro, on Windows 11
-  through libusb 1.0.30, on 2026-11-25. The libusb version in a trace's `stack` line
-  is read through ctypes; it gave 1.0.30 there, and is untried on other hosts.
+- **It has run against real hardware in two sessions:** a LabPro, on Windows 11
+  on 2026-11-25 and on macOS 26.6.2 on 2026-11-27, through libusb 1.0.30 on
+  both. The libusb version in a trace's `stack` line is read through ctypes. It
+  gave 1.0.30 on both, and is untried on Linux.
 - **Standard USB requests are not in the trace.** pyusb and libusb read the
   device's descriptors and its active configuration, and the script has pyusb
   set the first configuration when that read fails. A trace holds bulk
