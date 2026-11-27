@@ -9,8 +9,9 @@
 #   value     the fact
 #   unit      what the value measures, where it has a unit
 #   source    a key under [source]
-#   page      the source's PDF page; on the pages cited here the manual's
-#             printed page numbers match
+#   page      the source's PDF page. On the pages these fields cite, the
+#             manual's printed page numbers match. Its appendices are numbered
+#             apart, from the PDF's page 78: A-1, then B-1 and on
 #   evidence  the words on that page that state the fact; tools/check.py finds
 #             them on the page when the manual is present
 #   status    "manual": read from the source, not yet seen on a bench
@@ -661,6 +662,9 @@ note = "The port labelled CH1 (page 6) is channel number 1. Consistent with 2026
 # is the row's numbers: one number, two joined by a comma, or a first and a last
 # joined by " - ", as the rate facts write their channels.
 # tools/bench/fake_backend.py builds its model of a channel Command 1 takes from them.
+# The table of error codes, under error 12, gives other numbers: 1 to 3, 11, 21 and
+# 31 (the PDF's page 80, printed B-2). protocol/REFERENCE.md lists it among the
+# places where the manual disagrees with itself.
 
 [channel.numbers_all]
 value = "0"

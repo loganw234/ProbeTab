@@ -34,9 +34,11 @@ reader's check.
 Vernier's LabPro Technical Reference Manual, revision dated 08/02/02.
 
 - The copy cited is pinned by size and SHA-256 in labpro-facts.toml.
-- Page numbers are the PDF's own. On every page the facts file cites they
-  match the manual's printed numbers. Appendix B is numbered apart: the PDF's
-  pages 79 and 80 are printed B-1 and B-2.
+- Page numbers are the PDF's own. On every page a fact's `page` field cites,
+  they match the manual's printed numbers. The appendices are numbered apart:
+  the PDF's page 78 is printed A-1, pages 79 to 83 are B-1 to B-5, and page 84
+  is C-1. The facts file's notes and comments, REFERENCE.md and the runbook
+  cite some of those pages, always by the PDF's number.
 - The manual is not in this repository and is not to be added.
 
 ## traces/ and fixtures/

@@ -60,7 +60,10 @@ Talking to a LabPro also needs libusb, the library pyusb reaches USB through:
 - **macOS:** Homebrew's `libusb`. On Apple Silicon, Homebrew puts it in
   `/opt/homebrew/lib`, and pyusb 1.3.1 looks there by itself (its
   `libloader.py`). Where pyusb finds no libusb, pass the library's path with
-  `--libusb`. None of this has been run on a Mac.
+  `--libusb`. On 2026-11-19, by the owner's reports, the bench script on the
+  owner's MacBook found libusb by itself, with no `--libusb`: before the LabPro
+  had arrived, it refused "no LabPro found". An earlier try there refused for
+  want of a USB backend, for a cause not reported.
 - **Linux:** the distribution's libusb-1.0.
 - **Windows:** libusb's DLL, and the WinUSB driver bound to the LabPro. That
   changes the machine's drivers, and the plan leaves it to the owner's hand.

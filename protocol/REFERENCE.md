@@ -272,6 +272,16 @@ Each is a question for the bench, not something to code around.
     ([ch1-volt-opfirst](traces/2026-11-25-ch1-volt-opfirst.trace)). The
     manual's table of error codes gives 12 for a channel that does not exist
     (the PDF's page 80, printed B-2).
+- **Which channels Command 1 takes.**
+  - Page 31's table gives 0 for all channels, 1 to 4 for the analog ports, 11
+    and 12 for the DIG/SONIC ports, 21 and 22 for the digital inputs, and 31
+    and 32 for the digital outputs.
+  - The table of error codes, under error 12, gives the valid channels as 1 to
+    3, 11, 21 and 31 (the PDF's page 80, printed B-2).
+  - Every Command 1 in the 2026-11-25 recordings names channel 1, but one:
+    channel 14, which neither list holds, drew error 12
+    ([ch1-volt-opfirst](traces/2026-11-25-ch1-volt-opfirst.trace)). Which list
+    a unit holds is for the bench.
 - **A copied column.** In Example 2 on page 40, the calculator column repeats
   Example 1's commands beside a different sequence.
 - **Sixteen bits or sixteen bytes.** Page 23 says a real-time sample comes back

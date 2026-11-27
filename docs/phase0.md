@@ -31,8 +31,9 @@ On the MacBook, from the repository's root, at the latest `main`:
        .venv/bin/python -m pip install --require-hashes --no-deps -r tools/bench/requirements.txt
 
    pip installs only the pinned pyusb, by its hash. The bench README's own
-   commands are the ones the desktop used; these are their Mac form, not yet
-   run on a Mac.
+   commands are the ones the desktop used; these are their Mac form. On
+   2026-11-19 the owner's MacBook had such an environment: the gate's bench
+   check ran with `.venv/bin/python` and pyusb 1.3.1, by the owner's report.
 4. **Node 22.19 or later,** from `brew install node` if `node --version` gives
    an older one (BELIEVED to be new enough). Then, for typescript, in `app/`,
    run `npm ci --ignore-scripts`.
