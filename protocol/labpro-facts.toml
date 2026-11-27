@@ -343,6 +343,14 @@ status = "bench"
 trace = "2026-11-25-sound-on.trace"
 note = "Said of Command 6. A host listens briefly after it, and records anything that comes. In this trace nothing came in the 300 ms the script that recorded it listened after s{6,4}, and the next reply began with {."
 
+[system_setup.abort_sampling]
+value = 2
+source = "trm"
+page = 44
+evidence = "Undefined * 2 Abort Sampling"
+status = "manual"
+note = "The value of Command 6's first parameter, syssetup, that stops a run. Page 44 gives 0 for the same. Page 24 says points may still arrive after Command 6, so a host reads until the unit is quiet. Consistent with 2026-11-27-trial-realtime.trace, where real-time samples stopped after s{6,2}, nothing came in the 2 s after it, and the unit then read done."
+
 [system_setup.sound_off]
 value = 3
 source = "trm"
@@ -647,6 +655,22 @@ source = "trm"
 page = 35
 evidence = "The default sampling time is 0.5 second."
 status = "manual"
+
+[collection.trigger_immediate]
+value = 0
+source = "trm"
+page = 35
+evidence = "0 Immediate May not be used with frequency"
+status = "manual"
+note = "Command 3's trigger type, its fourth value, which page 35 calls immediate. Page 22's serial example sends it, as s{3,.1,-1,0}. Consistent with 2026-11-27-trial-stored.trace, where a stored run sent with it read armed, then busy, then done in about 2 s, with no press asked of the owner."
+
+[collection.trigger_manual]
+value = 1
+source = "trm"
+page = 35
+evidence = "1 Manual (default) May not be used with frequency"
+status = "manual"
+note = "Command 3's trigger type when none is sent. Page 12 says it means waiting for the unit's Start/Stop button, which a program usually does not want. Pages 7 and 8 have real time start once the command is processed, with no triggering by the unit. In 2026-11-27-trial-default-trigger.trace, s{3,0.5,-1} left Command 7's trigger condition at 1, and real-time samples still came at once. A stored run with it is not tried."
 
 # Command 1's operations for an analog channel, and Command 9's modes
 
